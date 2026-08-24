@@ -1,0 +1,176 @@
+/* General reset for electron layouts */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  background-color: #f8f9fa; /* Light theme background for sidebar */
+}
+
+/* Main app sidebar scrollable content */
+.sidebar-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+  background-color: #ffffff;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-content::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+/* Spotlight window transparent body */
+body.spotlight-mode {
+  background: transparent !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 4px; /* Space for the shadow */
+}
+
+/* Spotlight floating container */
+.spotlight-container {
+  width: 100%;
+  max-width: 480px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+}
+
+.spotlight-icon {
+  font-size: 1.25rem;
+  color: #6c757d;
+  margin-right: 12px;
+}
+
+.spotlight-input {
+  border: none;
+  outline: none;
+  font-size: 1.15rem;
+  width: 100%;
+  color: #212529;
+  background: transparent;
+}
+
+.spotlight-prefix-help {
+  font-size: 0.75rem;
+  color: #adb5bd;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* Active current task card */
+.current-task-card {
+  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+  color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 15px rgba(13, 110, 253, 0.35);
+  transition: all 0.2s ease-in-out;
+}
+
+.current-task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(13, 110, 253, 0.45);
+}
+
+/* Break task styling */
+.current-task-card.break-task {
+  background: linear-gradient(135deg, #198754, #157347); /* Green gradient */
+  box-shadow: 0 4px 15px rgba(25, 135, 84, 0.35);
+}
+
+.current-task-card.break-task:hover {
+  box-shadow: 0 6px 20px rgba(25, 135, 84, 0.45);
+}
+
+/* Urgent / Important task styling */
+.current-task-card.urgent-task {
+  background: linear-gradient(135deg, #dc3545, #bb2d3b); /* Red gradient */
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.35);
+  animation: pulse 2s infinite;
+}
+
+.current-task-card.urgent-task:hover {
+  box-shadow: 0 6px 20px rgba(220, 53, 69, 0.45);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.35);
+  }
+  50% {
+    box-shadow: 0 4px 25px rgba(220, 53, 69, 0.6);
+  }
+  100% {
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.35);
+  }
+}
+
+.task-item {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.task-item:hover {
+  border-color: #ced4da;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.task-text {
+  font-weight: 500;
+  color: #343a40;
+}
+
+.task-number-badge {
+  background-color: #e9ecef;
+  color: #495057;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
