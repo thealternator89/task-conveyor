@@ -32,6 +32,53 @@ declare global {
   }
 }
 
+const hashCode = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return hash;
+};
+
+const getTagStyles = (tag: string) => {
+  const hash = hashCode(tag);
+  const hue = Math.abs(hash) % 360;
+  
+  // High-contrast pastel HSL color scheme
+  const bg = `hsl(${hue}, 75%, 90%)`;
+  const text = `hsl(${hue}, 75%, 25%)`;
+  
+  return {
+    backgroundColor: bg,
+    color: text,
+    padding: '0.1rem 0.35rem',
+    borderRadius: '4px',
+    fontSize: '0.85em',
+    fontWeight: 'bold' as const,
+    display: 'inline-block',
+    margin: '0 2px'
+  };
+};
+
+const renderTaskTextWithTags = (text: string) => {
+  if (!text) return null;
+  const parts = text.split(/(?<=^|\s)([#@$]\w+)/g);
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return (
+            <span key={index} style={getTagStyles(part)} className="task-tag-badge">
+              {part}
+            </span>
+          );
+        }
+        return part;
+      })}
+    </>
+  );
+};
+
 const SpotlightInput = () => {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -431,7 +478,7 @@ const MainApp = () => {
                     {currentTask.important && <span className="badge bg-warning text-dark">URGENT</span>}
                     {currentTask.isBreak && <span className="badge bg-light text-success">BREAK</span>}
                   </div>
-                  <span className="text-break">{currentTask.text}</span>
+                  <span className="text-break">{renderTaskTextWithTags(currentTask.text)}</span>
                 </div>
               </h3>
             </div>
@@ -459,7 +506,7 @@ const MainApp = () => {
                     <span className="task-number-badge mt-1" style={{ flexShrink: 0 }}>{taskIndex}</span>
                     <span className="task-text text-break">
                       {task.isBreak && <span className="badge bg-success-subtle text-success me-1">BREAK</span>}
-                      {task.text}
+                      {renderTaskTextWithTags(task.text)}
                     </span>
                   </div>
                 </div>
