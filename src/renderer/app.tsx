@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faThumbtack,
-  faTerminal,
-  faListUl
+  faTerminal
 } from '@fortawesome/free-solid-svg-icons';
+import logoUrl from '../../assets/logo-full.png';
 
 interface TaskItem {
   id: string;
@@ -394,11 +394,11 @@ const MainApp = () => {
   return (
     <div className="sidebar-container">
       {/* Header */}
-      <header className="sidebar-header d-flex align-items-center justify-content-between">
-        <h5 className="mb-0 fw-bold text-primary">
-          <FontAwesomeIcon icon={faListUl} className="me-2" />
-          Task Conveyor
-        </h5>
+      <header className="sidebar-header d-flex align-items-center justify-content-between py-2">
+        <div className="d-flex align-items-center gap-2">
+          <img src={logoUrl} alt="Logo" style={{ height: '24px', objectFit: 'contain' }} />
+          <h5 className="mb-0 fw-bold text-dark">TaskConveyor</h5>
+        </div>
         {alwaysOnTop && (
           <span className="badge bg-primary-subtle text-primary small">
             <FontAwesomeIcon icon={faThumbtack} className="me-1" /> Pinned
