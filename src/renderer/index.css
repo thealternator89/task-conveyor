@@ -20,6 +20,7 @@ html, body {
   padding: 1rem;
   border-bottom: 1px solid #dee2e6;
   background-color: #ffffff;
+  -webkit-app-region: drag;
 }
 
 .sidebar-content {
@@ -43,43 +44,60 @@ html, body {
   background: #aaa;
 }
 
-/* Spotlight window transparent body */
+/* Spotlight window body */
 body.spotlight-mode {
-  background: transparent !important;
+  background: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 4px; /* Space for the shadow */
+  padding: 0;
+  margin: 0;
+  height: 100vh;
+  width: 100vw;
+
+  #root {
+    width: 100%;
+  }
 }
 
 /* Spotlight floating container */
 .spotlight-container {
   width: 100%;
-  max-width: 480px;
+  height: 100%;
+  max-width: 100%;
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
   overflow: hidden;
   display: flex;
   align-items: center;
-  padding: 8px 16px;
+  padding: 0 10px;
+  box-sizing: border-box;
 }
 
 .spotlight-icon {
   font-size: 1.25rem;
   color: #6c757d;
-  margin-right: 12px;
+  margin-right: 10px;
+  flex-shrink: 0;
 }
 
 .spotlight-input {
   border: none;
   outline: none;
   font-size: 1.15rem;
+  flex: 1;
   width: 100%;
+  min-width: 0;
   color: #212529;
   background: transparent;
+}
+
+.spotlight-badge {
+  margin-left: 10px;
+  flex-shrink: 0;
 }
 
 .spotlight-prefix-help {

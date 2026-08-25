@@ -128,9 +128,9 @@ const createSpotlightWindow = (): void => {
 
   spotlightWindow = new BrowserWindow({
     width: 500,
-    height: 70,
+    height: 50,
     frame: false,
-    transparent: true,
+    transparent: false,
     alwaysOnTop: true,
     show: false,
     resizable: false,
@@ -208,6 +208,8 @@ const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     height: 600,
     width: dockWidth,
+    maxWidth: dockWidth,
+    minWidth: dockWidth,
     frame: false,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
