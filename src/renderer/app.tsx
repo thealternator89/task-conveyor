@@ -18,6 +18,7 @@ interface TaskItem {
 interface ElectronAPI {
   sendTaskCommand: (text: string) => void;
   hideSpotlight: () => void;
+  quitApp: () => void;
   onTaskAdded: (callback: (text: string) => void) => () => void;
   onSpotlightShown: (callback: () => void) => () => void;
   toggleAlwaysOnTop: () => void;
@@ -366,11 +367,18 @@ const MainApp = () => {
       return;
     }
 
+    // /e[xit] or /q[uit]
+    const exitMatch = text.match(/^\/(?:e(?:xit)?|q(?:uit)?)$/i);
+    if (exitMatch) {
+      window.api.quitApp();
+      return;
+    }
+
     // /h[elp]
     const helpMatch = text.match(/^\/(?:h(?:elp)?|\?)$/i);
     if (helpMatch) {
       setWarning(
-        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /clear, /help'
+        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /clear, /exit, /help'
       );
       return;
     }
