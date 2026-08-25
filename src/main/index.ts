@@ -186,6 +186,10 @@ ipcMain.on('hide-spotlight', () => {
   }
 });
 
+ipcMain.on('quit-app', () => {
+  app.quit();
+});
+
 ipcMain.on('toggle-always-on-top', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     const state = !mainWindow.isAlwaysOnTop();
