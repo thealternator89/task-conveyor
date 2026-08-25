@@ -124,7 +124,7 @@ const SpotlightInput = () => {
 
   return (
     <div className="spotlight-container">
-      <FontAwesomeIcon icon={faTerminal} className="spotlight-icon me-2" />
+      <FontAwesomeIcon icon={faTerminal} className="spotlight-icon" />
       <input
         ref={inputRef}
         type="text"
@@ -134,7 +134,7 @@ const SpotlightInput = () => {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
       />
-      <span className="badge bg-secondary ms-2 text-nowrap">
+      <span className="badge bg-secondary text-nowrap spotlight-badge">
         {getPrefixHelp()}
       </span>
     </div>
