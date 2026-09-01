@@ -473,8 +473,8 @@ const MainApp = () => {
           <h5 className="mb-0 fw-bold text-dark">TaskConveyor</h5>
         </div>
         {alwaysOnTop && (
-          <span className="badge bg-primary-subtle text-primary small">
-            <FontAwesomeIcon icon={faThumbtack} className="me-1" /> Pinned
+          <span className="badge bg-primary-subtle text-primary small" title="Pinned">
+            <FontAwesomeIcon icon={faThumbtack} />
           </span>
         )}
       </header>
@@ -499,13 +499,7 @@ const MainApp = () => {
             } mb-0`}>
               <h3 className="fw-bold mb-0 text-break d-flex align-items-start">
                 <span className="task-number-badge me-2 mt-1" style={{ backgroundColor: 'rgba(255, 255, 255, 0.25)', color: 'white', flexShrink: 0 }}>0</span>
-                <div className="d-flex flex-column align-items-start min-w-0">
-                  <div className="d-flex gap-1 mb-1">
-                    {currentTask.important && <span className="badge bg-warning text-dark">URGENT</span>}
-                    {currentTask.isBreak && <span className="badge bg-light text-success">BREAK</span>}
-                  </div>
-                  <span className="text-break">{renderTaskTextWithTags(currentTask.text)}</span>
-                </div>
+                <span className="text-break">{renderTaskTextWithTags(currentTask.text)}</span>
               </h3>
             </div>
           ) : (
