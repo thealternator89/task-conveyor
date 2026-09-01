@@ -33,7 +33,10 @@ interface ElectronAPI {
   toggleAlwaysOnTop: () => void;
   onAlwaysOnTopChanged: (callback: (state: boolean) => void) => () => void;
   getInitialAlwaysOnTop: () => Promise<boolean>;
-  getHotkeyString: () => string;
+  getHotkeyString: () => Promise<string>;
+  getConfig: () => Promise<{ globalHotkey: string }>;
+  openConfig: () => Promise<void>;
+  onHotkeyConfigChanged: (callback: (data: { newHotkey: string; activeHotkey: string }) => void) => () => void;
   getAutocompleteData: () => Promise<AutocompleteConfig>;
   openAutocompleteConfig: () => Promise<void>;
   onAutocompleteUpdated: (callback: (data: AutocompleteConfig) => void) => () => void;
@@ -307,6 +310,8 @@ const MainApp = () => {
   const footerInputRef = useRef<HTMLInputElement>(null);
   const [history, setHistory] = useState<TaskItem[] | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [hotkeyString, setHotkeyString] = useState<string>('');
+  const [restartRequired, setRestartRequired] = useState(false);
 
   // Sync refs to avoid stale closures in event listeners
   const tasksRef = useRef<TaskItem[]>(tasks);
@@ -329,6 +334,19 @@ const MainApp = () => {
   useEffect(() => {
     window.api.getInitialAlwaysOnTop().then(setAlwaysOnTop);
     const unsubscribe = window.api.onAlwaysOnTopChanged(setAlwaysOnTop);
+    return unsubscribe;
+  }, []);
+
+  // Fetch initial hotkey string and listen for hotkey config changes
+  useEffect(() => {
+    window.api.getHotkeyString().then((str) => {
+      if (str) setHotkeyString(str);
+    });
+
+    const unsubscribe = window.api.onHotkeyConfigChanged(() => {
+      setRestartRequired(true);
+    });
+
     return unsubscribe;
   }, []);
 
@@ -608,9 +626,16 @@ const MainApp = () => {
       return;
     }
 
-    // /config or /tags
-    const configMatch = text.match(/^\/(?:config|tags)$/i);
+    // /config (general app config)
+    const configMatch = text.match(/^\/config$/i);
     if (configMatch) {
+      window.api.openConfig();
+      return;
+    }
+
+    // /tags or /autocomplete (autocomplete config)
+    const tagsMatch = text.match(/^\/(?:tags|autocomplete)$/i);
+    if (tagsMatch) {
       window.api.openAutocompleteConfig();
       return;
     }
@@ -626,7 +651,7 @@ const MainApp = () => {
     const helpMatch = text.match(/^\/(?:h(?:elp)?|\?)$/i);
     if (helpMatch) {
       setWarning(
-        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /dock [l|r], /float, /config, /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
+        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /dock [l|r], /float, /config, /tags, /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
       );
       return;
     }
@@ -714,11 +739,15 @@ const MainApp = () => {
       {/* Main Content Area */}
       <div className="sidebar-content">
         {/* Warning Toast/Alert */}
-        {warning && (
+        {restartRequired ? (
+          <div className="alert alert-info py-2 px-3 mb-3 border-0 rounded-3 shadow-sm small" role="alert">
+            Restart TaskConveyor to use your new global hotkey.
+          </div>
+        ) : warning ? (
           <div className="alert alert-warning py-2 px-3 mb-3 border-0 rounded-3 shadow-sm small" role="alert">
             {warning}
           </div>
-        )}
+        ) : null}
 
         {/* CURRENT TASK (Large, Top) */}
         <div className="mb-4">
@@ -738,7 +767,7 @@ const MainApp = () => {
             <div className="p-4 text-center border rounded-3 bg-white text-muted shadow-sm">
               <p className="mb-2">No active task</p>
               <small className="d-block text-muted">
-                Press <kbd>{window.api.getHotkeyString()}</kbd> to add a task.
+                Press <kbd>{hotkeyString || '...'}</kbd> to add a task.
               </small>
             </div>
           )}
@@ -803,7 +832,7 @@ const MainApp = () => {
         </form>
         <div className="d-flex justify-content-between align-items-center mt-2">
           <span className="text-muted small">
-            Global Hotkey: <kbd className="bg-light text-dark border">{window.api.getHotkeyString()}</kbd>
+            Global Hotkey: <kbd className="bg-light text-dark border">{hotkeyString || '...'}</kbd>
           </span>
           <span className="text-muted small">
             Type <kbd className="bg-light text-dark border">/help</kbd> for commands
