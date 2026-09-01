@@ -6,6 +6,13 @@ import {
   faTerminal
 } from '@fortawesome/free-solid-svg-icons';
 import logoUrl from '../../assets/logo-full.png';
+import {
+  AutocompleteConfig,
+  AutocompleteMatch,
+  getSuggestions,
+  applyCompletion
+} from './autocomplete';
+import { AutocompletePopover } from './AutocompletePopover';
 
 interface TaskItem {
   id: string;
@@ -27,6 +34,9 @@ interface ElectronAPI {
   onAlwaysOnTopChanged: (callback: (state: boolean) => void) => () => void;
   getInitialAlwaysOnTop: () => Promise<boolean>;
   getHotkeyString: () => string;
+  getAutocompleteData: () => Promise<AutocompleteConfig>;
+  openAutocompleteConfig: () => Promise<void>;
+  onAutocompleteUpdated: (callback: (data: AutocompleteConfig) => void) => () => void;
 }
 
 declare global {
@@ -65,7 +75,7 @@ const getTagStyles = (tag: string) => {
 
 const renderTaskTextWithTags = (text: string) => {
   if (!text) return null;
-  const parts = text.split(/(?<=^|\s)([#@$]\w+)/g);
+  const parts = text.split(/(?<=^|\s)([#@$][\w-]+)/g);
   return (
     <>
       {parts.map((part, index) => {
@@ -82,9 +92,42 @@ const renderTaskTextWithTags = (text: string) => {
   );
 };
 
+const autoCapitalizeFirstLetter = (newValue: string, prevValue: string): string => {
+  const singleLetterMatch = newValue.match(/^(!{0,2}\s*)([a-z])$/);
+  const prevWasPrefixOnly = /^!{0,2}\s*$/.test(prevValue);
+
+  if (singleLetterMatch && prevWasPrefixOnly) {
+    const prefix = singleLetterMatch[1];
+    const char = singleLetterMatch[2];
+    return `${prefix}${char.toUpperCase()}`;
+  }
+  return newValue;
+};
+
 const SpotlightInput = () => {
   const [value, setValue] = useState('');
+  const [autocompleteConfig, setAutocompleteConfig] = useState<AutocompleteConfig>({
+    tags: [],
+    projects: [],
+    mentions: []
+  });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
+  const [caretPos, setCaretPos] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load and listen for autocomplete config
+  useEffect(() => {
+    window.api.getAutocompleteData().then((data) => {
+      if (data) setAutocompleteConfig(data);
+    });
+
+    const unsubscribe = window.api.onAutocompleteUpdated((data) => {
+      if (data) setAutocompleteConfig(data);
+    });
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     // Add custom class to body for transparent, centered styling
@@ -98,6 +141,9 @@ const SpotlightInput = () => {
     // Handle show event from main process to select/focus
     const unsubscribe = window.api.onSpotlightShown(() => {
       setValue('');
+      setDismissed(false);
+      setSelectedIndex(0);
+      setCaretPos(0);
       if (inputRef.current) {
         inputRef.current.focus();
       }
@@ -109,17 +155,79 @@ const SpotlightInput = () => {
     };
   }, []);
 
+  const { matches, ghostSuffix } = getSuggestions(autocompleteConfig, value, caretPos);
+  const activeMatch = matches[selectedIndex] || matches[0];
+  const showSuggestions = matches.length > 0 && !dismissed;
+
+  const updateCaret = (target: HTMLInputElement) => {
+    setCaretPos(target.selectionStart ?? target.value.length);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextVal = autoCapitalizeFirstLetter(e.target.value, value);
+    setValue(nextVal);
+    setDismissed(false);
+    setSelectedIndex(0);
+    updateCaret(e.target);
+  };
+
+  const handleSelectSuggestion = (match: AutocompleteMatch) => {
+    const { newText, newCaretPos } = applyCompletion(value, match);
+    setValue(newText);
+    setCaretPos(newCaretPos);
+    setDismissed(false);
+    setSelectedIndex(0);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(newCaretPos, newCaretPos);
+      }
+    }, 0);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Tab' && showSuggestions && activeMatch) {
+      e.preventDefault();
+      handleSelectSuggestion(activeMatch);
+      return;
+    }
+    if (e.key === 'ArrowDown' && showSuggestions) {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % matches.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' && showSuggestions) {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + matches.length) % matches.length);
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (showSuggestions) {
+        e.preventDefault();
+        setDismissed(true);
+        return;
+      }
+      window.api.hideSpotlight();
+      setValue('');
+      return;
+    }
     if (e.key === 'Enter') {
       window.api.sendTaskCommand(value);
       setValue('');
-    } else if (e.key === 'Escape') {
-      window.api.hideSpotlight();
-      setValue('');
+      setDismissed(false);
+      setSelectedIndex(0);
     }
   };
 
+  const handleKeyUpOrSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    updateCaret(e.currentTarget);
+  };
+
   const getPrefixHelp = () => {
+    if (showSuggestions && activeMatch) {
+      const typeLabel = activeMatch.type === 'tag' ? 'Tag' : activeMatch.type === 'project' ? 'Project' : 'Mention';
+      return `[Tab] ${typeLabel}`;
+    }
     if (value.startsWith('!!')) return '⚡ Current Slot';
     if (value.startsWith('!')) return '➡️ Next Slot';
     return '📥 End of List';
@@ -127,19 +235,51 @@ const SpotlightInput = () => {
 
   return (
     <div className="spotlight-container">
-      <FontAwesomeIcon icon={faTerminal} className="spotlight-icon" />
-      <input
-        ref={inputRef}
-        type="text"
-        className="spotlight-input"
-        placeholder="Type a task... (!next, !!current)"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <span className="badge bg-secondary text-nowrap spotlight-badge">
-        {getPrefixHelp()}
-      </span>
+      <div className="spotlight-main-row">
+        <FontAwesomeIcon icon={faTerminal} className="spotlight-icon" />
+        <div className="input-autocomplete-wrapper">
+          <div className="ghost-text-mirror" aria-hidden="true">
+            <span className="invisible-typed">{value.slice(0, caretPos)}</span>
+            {showSuggestions && <span className="ghost-suffix">{ghostSuffix}</span>}
+          </div>
+          <input
+            ref={inputRef}
+            type="text"
+            className="spotlight-input"
+            placeholder="Type a task..."
+            value={value}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUpOrSelect}
+            onClick={handleKeyUpOrSelect}
+          />
+        </div>
+        <span className="badge bg-secondary text-nowrap spotlight-badge">
+          {getPrefixHelp()}
+        </span>
+      </div>
+      <div className="spotlight-lip">
+        <div className="spotlight-lip-hints">
+          <span className="spotlight-lip-item">
+            <span className="spotlight-lip-key">!</span> next
+          </span>
+          <span className="spotlight-lip-item">
+            <span className="spotlight-lip-key">!!</span> current
+          </span>
+          <span className="spotlight-lip-item">
+            <span className="spotlight-lip-key">#</span> tag
+          </span>
+          <span className="spotlight-lip-item">
+            <span className="spotlight-lip-key">$</span> project
+          </span>
+          <span className="spotlight-lip-item">
+            <span className="spotlight-lip-key">@</span> mention
+          </span>
+        </div>
+        <span className="text-muted" style={{ fontSize: '0.68rem' }}>
+          <span className="spotlight-lip-key">Tab</span> accept
+        </span>
+      </div>
     </div>
   );
 };
@@ -156,6 +296,15 @@ const MainApp = () => {
 
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [autocompleteConfig, setAutocompleteConfig] = useState<AutocompleteConfig>({
+    tags: [],
+    projects: [],
+    mentions: []
+  });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
+  const [caretPos, setCaretPos] = useState(0);
+  const footerInputRef = useRef<HTMLInputElement>(null);
   const [history, setHistory] = useState<TaskItem[] | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
@@ -183,6 +332,19 @@ const MainApp = () => {
     return unsubscribe;
   }, []);
 
+  // Load and listen for autocomplete config
+  useEffect(() => {
+    window.api.getAutocompleteData().then((data) => {
+      if (data) setAutocompleteConfig(data);
+    });
+
+    const unsubscribe = window.api.onAutocompleteUpdated((data) => {
+      if (data) setAutocompleteConfig(data);
+    });
+
+    return unsubscribe;
+  }, []);
+
   // Auto-dismiss warning
   useEffect(() => {
     if (warning) {
@@ -190,6 +352,67 @@ const MainApp = () => {
       return () => clearTimeout(timer);
     }
   }, [warning]);
+
+  const { matches, ghostSuffix } = getSuggestions(autocompleteConfig, inputValue, caretPos);
+  const showSuggestions = matches.length > 0 && !dismissed;
+
+  const updateCaret = (target: HTMLInputElement) => {
+    setCaretPos(target.selectionStart ?? target.value.length);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextVal = autoCapitalizeFirstLetter(e.target.value, inputValue);
+    setInputValue(nextVal);
+    setDismissed(false);
+    setSelectedIndex(0);
+    updateCaret(e.target);
+  };
+
+  const handleSelectSuggestion = (match: AutocompleteMatch) => {
+    const { newText, newCaretPos } = applyCompletion(inputValue, match);
+    setInputValue(newText);
+    setCaretPos(newCaretPos);
+    setDismissed(false);
+    setSelectedIndex(0);
+    setTimeout(() => {
+      if (footerInputRef.current) {
+        footerInputRef.current.focus();
+        footerInputRef.current.setSelectionRange(newCaretPos, newCaretPos);
+      }
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Tab' && showSuggestions) {
+      e.preventDefault();
+      const activeMatch = matches[selectedIndex] || matches[0];
+      if (activeMatch) {
+        handleSelectSuggestion(activeMatch);
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown' && showSuggestions) {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % matches.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' && showSuggestions) {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + matches.length) % matches.length);
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (showSuggestions) {
+        e.preventDefault();
+        setDismissed(true);
+        return;
+      }
+    }
+  };
+
+  const handleKeyUpOrSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    updateCaret(e.currentTarget);
+  };
 
   const isDemotion = (taskList: TaskItem[], fromIndex: number, toIndex: number): boolean => {
     if (taskList.length === 0) return false;
@@ -385,6 +608,13 @@ const MainApp = () => {
       return;
     }
 
+    // /config or /tags
+    const configMatch = text.match(/^\/(?:config|tags)$/i);
+    if (configMatch) {
+      window.api.openAutocompleteConfig();
+      return;
+    }
+
     // /e[xit] or /q[uit]
     const exitMatch = text.match(/^\/(?:e(?:xit)?|q(?:uit)?)$/i);
     if (exitMatch) {
@@ -396,7 +626,7 @@ const MainApp = () => {
     const helpMatch = text.match(/^\/(?:h(?:elp)?|\?)$/i);
     if (helpMatch) {
       setWarning(
-        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /dock [l|r], /float, /clear, /exit, /help'
+        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /dock [l|r], /float, /config, /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
       );
       return;
     }
@@ -459,6 +689,8 @@ const MainApp = () => {
     if (!text) return;
     executeCommand(text);
     setInputValue('');
+    setDismissed(false);
+    setSelectedIndex(0);
   };
 
   const currentTask = tasks[0];
@@ -541,15 +773,33 @@ const MainApp = () => {
       </div>
 
       {/* Footer input form */}
-      <footer className="p-3 bg-white border-top">
-        <form onSubmit={handleAddDirectTask}>
-          <input
-            type="text"
-            className="form-control form-control-sm"
-            placeholder="Type task or command..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+      <footer className="p-3 bg-white border-top position-relative">
+        {showSuggestions && (
+          <AutocompletePopover
+            matches={matches}
+            selectedIndex={selectedIndex}
+            onSelect={handleSelectSuggestion}
+            position="above"
           />
+        )}
+        <form onSubmit={handleAddDirectTask}>
+          <div className="input-autocomplete-wrapper">
+            <div className="ghost-text-mirror" aria-hidden="true">
+              <span className="invisible-typed">{inputValue.slice(0, caretPos)}</span>
+              {showSuggestions && <span className="ghost-suffix">{ghostSuffix}</span>}
+            </div>
+            <input
+              ref={footerInputRef}
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Type a task..."
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onKeyUp={handleKeyUpOrSelect}
+              onClick={handleKeyUpOrSelect}
+            />
+          </div>
         </form>
         <div className="d-flex justify-content-between align-items-center mt-2">
           <span className="text-muted small">
