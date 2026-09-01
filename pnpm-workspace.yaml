@@ -1,0 +1,13 @@
+packages:
+  - '.'
+
+nodeLinker: hoisted
+blockExoticSubdeps: false
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - koffi
+  - '@electron/node-gyp'
+allowBuilds:
+  electron-winstaller: true
+  koffi: true

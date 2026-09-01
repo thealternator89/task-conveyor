@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "My Electron application description",
   "main": ".webpack/main",
+  "packageManager": "pnpm@11.24.0",
   "private": true,
   "scripts": {
     "start": "electron-forge start",
@@ -32,7 +33,7 @@
     "@types/react-dom": "^19.2.5",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
-    "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "@vercel/webpack-asset-relocator-loader": "1.7.3",
     "css-loader": "^6.11.0",
     "electron": "43.4.1",
     "eslint": "^8.57.1",
