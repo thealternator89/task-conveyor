@@ -49,8 +49,8 @@ Type any of the following commands in the Spotlight overlay or the sidebar foote
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v16+ recommended)
-- npm
+- [Node.js](https://nodejs.org/) (v20+ recommended)
+- [pnpm](https://pnpm.io/)
 
 ### Installation
 
@@ -59,7 +59,7 @@ Clone the repository and install the project dependencies:
 ```bash
 git clone https://github.com/thealternator89/task-conveyor.git
 cd task-conveyor
-npm install
+pnpm install
 ```
 
 ### Running in Development
@@ -67,7 +67,7 @@ npm install
 Start the Electron app in development mode with hot-reloading:
 
 ```bash
-npm start
+pnpm start
 ```
 
 ### Build & Package
@@ -76,10 +76,10 @@ To package the application for production:
 
 ```bash
 # Packages the app for your current OS platform
-npm run package
+pnpm run package
 
 # Creates distributable installers (DMG, Zip, Squirrel, etc.)
-npm run make
+pnpm run make
 ```
 
 ### Linting
@@ -87,5 +87,5 @@ npm run make
 Run ESLint to check for code issues:
 
 ```bash
-npm run lint
+pnpm run lint
 ```
