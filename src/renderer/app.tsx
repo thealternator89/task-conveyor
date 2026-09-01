@@ -820,7 +820,7 @@ const MainApp = () => {
               );
             })
           ) : (
-            <div className="p-3 text-center text-muted small border border-dashed rounded bg-light">
+            <div className="p-3 text-center text-muted small border border-dashed rounded bg-white shadow-sm">
               No tasks lined up
             </div>
           )}
