@@ -29,7 +29,16 @@ contextBridge.exposeInMainWorld('api', {
     };
   },
   getInitialAlwaysOnTop: () => ipcRenderer.invoke('get-always-on-top'),
-  getHotkeyString: () => process.platform === 'win32' ? 'Ctrl+Space' : '⌥Space',
+  getHotkeyString: () => ipcRenderer.invoke('get-hotkey-string'),
+  getConfig: () => ipcRenderer.invoke('get-config'),
+  openConfig: () => ipcRenderer.invoke('open-config'),
+  onHotkeyConfigChanged: (callback: (data: { newHotkey: string; activeHotkey: string }) => void) => {
+    const subscription = (_event: unknown, data: { newHotkey: string; activeHotkey: string }) => callback(data);
+    ipcRenderer.on('hotkey-config-changed', subscription);
+    return () => {
+      ipcRenderer.removeListener('hotkey-config-changed', subscription);
+    };
+  },
   getAutocompleteData: () => ipcRenderer.invoke('get-autocomplete-data'),
   openAutocompleteConfig: () => ipcRenderer.invoke('open-autocomplete-config'),
   onAutocompleteUpdated: (callback: (data: { tags: string[]; projects: string[]; mentions: string[] }) => void) => {
