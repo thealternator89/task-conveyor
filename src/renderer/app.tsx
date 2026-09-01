@@ -563,7 +563,33 @@ const MainApp = () => {
       return;
     }
 
-    // 6. /u[ndo]
+    // 6. /e[dit] x replace
+    const editMatch = text.match(/^\/e(?:dit)?\s+(\d+)\s+(.+)$/i);
+    if (editMatch) {
+      const x = parseInt(editMatch[1], 10);
+      const index = x;
+      const newText = editMatch[2].trim();
+
+      if (!newText) {
+        setWarning('Edit text cannot be empty.');
+        return;
+      }
+
+      if (index < 0 || index >= currentTasks.length) {
+        setWarning('Edit index out of bounds.');
+        return;
+      }
+
+      setHistory(currentTasks);
+      setTasks(prev => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], text: newText, isBreak: false };
+        return updated;
+      });
+      return;
+    }
+
+    // 7. /u[ndo]
     const undoMatch = text.match(/^\/u(?:ndo)?$/i);
     if (undoMatch) {
       if (currentHistory) {
@@ -575,7 +601,7 @@ const MainApp = () => {
       return;
     }
 
-    // 7. /i[mportant]
+    // 8. /i[mportant]
     const importantMatch = text.match(/^\/i(?:mportant)?$/i);
     if (importantMatch) {
       if (currentTasks.length === 0) {
@@ -640,8 +666,8 @@ const MainApp = () => {
       return;
     }
 
-    // /e[xit] or /q[uit]
-    const exitMatch = text.match(/^\/(?:e(?:xit)?|q(?:uit)?)$/i);
+    // /x or /exit or /q[uit]
+    const exitMatch = text.match(/^\/(?:x|exit|q(?:uit)?)$/i);
     if (exitMatch) {
       window.api.quitApp();
       return;
@@ -651,7 +677,7 @@ const MainApp = () => {
     const helpMatch = text.match(/^\/(?:h(?:elp)?|\?)$/i);
     if (helpMatch) {
       setWarning(
-        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /dock [l|r], /float, /config, /tags, /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
+        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /edit x text, /undo, /important, /pin, /dock [l|r], /float, /config, /tags, /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
       );
       return;
     }

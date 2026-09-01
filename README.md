@@ -38,12 +38,14 @@ Type any of the following commands in the Spotlight overlay or the sidebar foote
 | `/m[ove] x y` | Absolute Move | Moves task `x` (0-indexed) to index `y`. (Blocked if it demotes an important task). |
 | `/m[ove] x u\|d [y]` | Relative Move | Moves task `x` (0-indexed) up (`u`) or down (`d`) by `y` spots (default `1`). Clamps at list bounds. (Blocked if it demotes an important task). |
 | `/r[emove] x` | Remove Task | Deletes task `x` (0-indexed) from the list. |
+| `/e[dit] x <text>` | Edit Task | Replaces the content of task `x` (0-indexed) with the new text. |
 | `/u[ndo]` | Undo Last Action | Reverts the previous command (1-level history depth). |
 | `/i[mportant]` | Toggle Urgent | Toggles important status on the current task (index 0). Styles it with a pulsing red card and blocks any demotion. |
 | `/p[in]` | Toggle Pin | Pinned/always-on-top toggle for the sidebar dock. |
 | `/config` | Open App Config | Opens general `config.json` (e.g. `globalHotkey`) in your default text editor. |
 | `/tags` or `/autocomplete` | Open Autocomplete Config | Opens `autocomplete.json` in your default text editor. |
 | `/c[lear]` | Clear All | Clears all tasks from the conveyor belt. |
+| `/x` or `/exit` or `/q[uit]` | Exit App | Quits and closes Task Conveyor. |
 | `/h[elp]` or `/?` | Help | Displays a help message in the sidebar listing available commands. |
 
 ---
