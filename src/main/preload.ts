@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('api', {
   sendTaskCommand: (text: string) => ipcRenderer.send('submit-task', text),
   hideSpotlight: () => ipcRenderer.send('hide-spotlight'),
   quitApp: () => ipcRenderer.send('quit-app'),
+  dockWindow: (side: 'left' | 'right') => ipcRenderer.send('dock-window', side),
+  floatWindow: () => ipcRenderer.send('float-window'),
   onTaskAdded: (callback: (text: string) => void) => {
     const subscription = (_event: unknown, text: string) => callback(text);
     ipcRenderer.on('task-added', subscription);

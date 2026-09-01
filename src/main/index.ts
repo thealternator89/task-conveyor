@@ -20,8 +20,27 @@ let koffi: any = null;
 
 const MY_APPBAR_MSG_ID = 1124;
 
+const ABM_NEW = 0;
+const ABM_REMOVE = 1;
+const ABM_QUERYPOS = 2;
+const ABM_SETPOS = 3;
+
+const ABE_LEFT = 0;
+const ABE_RIGHT = 2;
+
+const ABN_POSCHANGED = 1;
+
 let mainWindow: BrowserWindow | null = null;
 let spotlightWindow: BrowserWindow | null = null;
+let isAppBarRegistered = false;
+let currentDockSide: 'left' | 'right' | null = null;
+
+interface RECTType {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 
 if (process.platform === 'win32') {
   try {
@@ -36,7 +55,7 @@ if (process.platform === 'win32') {
 
     APPBARDATA = koffi.struct('APPBARDATA', {
       cbSize: 'uint32',
-      hWnd: 'void*',
+      hWnd: 'intptr_t',
       uCallbackMessage: 'uint32',
       uEdge: 'uint32',
       rc: RECT,
@@ -44,83 +63,154 @@ if (process.platform === 'win32') {
     });
 
     const shell32 = koffi.load('shell32.dll');
-    SHAppBarMessage = shell32.func('uintptr_t SHAppBarMessage(uint32_t dwMessage, _Inout_ APPBARDATA *pData)');
+    SHAppBarMessage = shell32.func('uintptr_t __stdcall SHAppBarMessage(uint32_t dwMessage, _Inout_ APPBARDATA *pData)');
   } catch (err) {
     console.error('Failed to initialize Windows AppBar API:', err);
   }
 }
 
-const registerAppBar = (hwnd: Buffer, win: BrowserWindow) => {
-  if (!SHAppBarMessage || !APPBARDATA) return;
-
-  const data = {
-    cbSize: koffi.sizeof(APPBARDATA),
-    hWnd: hwnd,
-    uCallbackMessage: MY_APPBAR_MSG_ID,
-    uEdge: 2, // ABE_RIGHT = 2
-    rc: { left: 0, top: 0, right: 0, bottom: 0 },
-    lParam: 0
-  };
-
-  SHAppBarMessage(0, data); // ABM_NEW = 0
-
-  // Hook window message for position changes
-  win.hookWindowMessage(MY_APPBAR_MSG_ID, (wParam: Buffer) => {
-    const code = wParam.length === 8 ? wParam.readBigUInt64LE(0) : BigInt(wParam.readUInt32LE(0));
-    if (code === BigInt(1)) { // ABN_POSCHANGED = 1
-      updateAppBarPosition(hwnd, win);
-    }
-  });
-
-  // Perform initial positioning
-  updateAppBarPosition(hwnd, win);
+const getWindowHwnd = (win: BrowserWindow): bigint => {
+  const buf = win.getNativeWindowHandle();
+  return process.arch === 'ia32' ? BigInt(buf.readUInt32LE(0)) : buf.readBigUInt64LE(0);
 };
 
-const updateAppBarPosition = (hwnd: Buffer, win: BrowserWindow) => {
-  if (!SHAppBarMessage || !APPBARDATA) return;
+const callAppBar = (
+  dwMessage: number,
+  hwndBigInt: bigint,
+  uEdge: number,
+  rc?: RECTType
+): { res: number; rc: RECTType; uEdge: number } => {
+  if (!SHAppBarMessage || !APPBARDATA || !koffi) {
+    return { res: 0, rc: rc || { left: 0, top: 0, right: 0, bottom: 0 }, uEdge };
+  }
 
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { x, y, width, height } = primaryDisplay.bounds;
+  const pData = koffi.alloc(APPBARDATA, 1);
+  koffi.encode(pData, APPBARDATA, {
+    cbSize: koffi.sizeof(APPBARDATA),
+    hWnd: hwndBigInt,
+    uCallbackMessage: MY_APPBAR_MSG_ID,
+    uEdge: uEdge,
+    rc: rc || { left: 0, top: 0, right: 0, bottom: 0 },
+    lParam: 0
+  });
+
+  const res = SHAppBarMessage(dwMessage, pData);
+  const decoded = koffi.decode(pData, APPBARDATA);
+  return { res: Number(res), rc: decoded.rc, uEdge: decoded.uEdge };
+};
+
+const dockWindow = (side: 'left' | 'right') => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  const uEdge = side === 'left' ? ABE_LEFT : ABE_RIGHT;
+  const currentBounds = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(currentBounds);
+  const scale = display.scaleFactor || 1;
   const dockWidth = 400;
 
-  const data = {
-    cbSize: koffi.sizeof(APPBARDATA),
-    hWnd: hwnd,
-    uCallbackMessage: MY_APPBAR_MSG_ID,
-    uEdge: 2, // ABE_RIGHT = 2
-    rc: {
-      left: x + width - dockWidth,
-      top: y,
-      right: x + width,
-      bottom: y + height
-    },
-    lParam: 0
-  };
+  if (process.platform === 'win32' && SHAppBarMessage) {
+    const hwnd = getWindowHwnd(mainWindow);
 
-  SHAppBarMessage(2, data); // ABM_QUERYPOS = 2
-  SHAppBarMessage(3, data); // ABM_SETPOS = 3
+    // If not registered yet, register as an AppBar
+    if (!isAppBarRegistered) {
+      callAppBar(ABM_NEW, hwnd, uEdge);
+      isAppBarRegistered = true;
+    }
 
-  win.setBounds({
-    x: data.rc.left,
-    y: data.rc.top,
-    width: data.rc.right - data.rc.left,
-    height: data.rc.bottom - data.rc.top
+    // Convert display bounds to physical pixels for Win32 API
+    const monLeftPhysical = Math.round(display.bounds.x * scale);
+    const monTopPhysical = Math.round(display.bounds.y * scale);
+    const monRightPhysical = Math.round((display.bounds.x + display.bounds.width) * scale);
+    const monBottomPhysical = Math.round((display.bounds.y + display.bounds.height) * scale);
+    const dockWidthPhysical = Math.round(dockWidth * scale);
+
+    const initialRc: RECTType = {
+      left: side === 'left' ? monLeftPhysical : monRightPhysical - dockWidthPhysical,
+      top: monTopPhysical,
+      right: side === 'left' ? monLeftPhysical + dockWidthPhysical : monRightPhysical,
+      bottom: monBottomPhysical
+    };
+
+    // ABM_QUERYPOS: request position
+    const queryResult = callAppBar(ABM_QUERYPOS, hwnd, uEdge, initialRc);
+
+    // Maintain requested width on the chosen edge
+    const adjustedRc: RECTType = { ...queryResult.rc };
+    if (uEdge === ABE_LEFT) {
+      adjustedRc.right = adjustedRc.left + dockWidthPhysical;
+    } else {
+      adjustedRc.left = adjustedRc.right - dockWidthPhysical;
+    }
+
+    // ABM_SETPOS: reserve space in the OS desktop work area
+    const setPosResult = callAppBar(ABM_SETPOS, hwnd, uEdge, adjustedRc);
+
+    // Convert result back from physical pixels to DIPs for Electron
+    const finalBounds = {
+      x: Math.round(setPosResult.rc.left / scale),
+      y: Math.round(setPosResult.rc.top / scale),
+      width: Math.round((setPosResult.rc.right - setPosResult.rc.left) / scale),
+      height: Math.round((setPosResult.rc.bottom - setPosResult.rc.top) / scale)
+    };
+
+    mainWindow.setBounds(finalBounds);
+    currentDockSide = side;
+  } else {
+    // Non-Windows fallback
+    const { x, y, width: workAreaWidth, height: workAreaHeight } = display.workArea;
+    mainWindow.setBounds({
+      x: side === 'left' ? x : x + workAreaWidth - dockWidth,
+      y: y,
+      width: dockWidth,
+      height: workAreaHeight
+    });
+    currentDockSide = side;
+  }
+
+  if (!mainWindow.isAlwaysOnTop()) {
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.webContents.send('always-on-top-changed', true);
+  }
+};
+
+const floatWindow = () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (process.platform === 'win32' && SHAppBarMessage && isAppBarRegistered) {
+    const hwnd = getWindowHwnd(mainWindow);
+    const uEdge = currentDockSide === 'left' ? ABE_LEFT : ABE_RIGHT;
+    callAppBar(ABM_REMOVE, hwnd, uEdge);
+    isAppBarRegistered = false;
+  }
+
+  currentDockSide = null;
+
+  const currentBounds = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(currentBounds);
+  const { x, y, width, height } = display.workArea;
+  const defaultWidth = 400;
+  const defaultHeight = 600;
+
+  mainWindow.setBounds({
+    x: Math.round(x + (width - defaultWidth) / 2),
+    y: Math.round(y + (height - defaultHeight) / 2),
+    width: defaultWidth,
+    height: defaultHeight
   });
 };
 
-const unregisterAppBar = (hwnd: Buffer) => {
-  if (!SHAppBarMessage || !APPBARDATA) return;
-
-  const data = {
-    cbSize: koffi.sizeof(APPBARDATA),
-    hWnd: hwnd,
-    uCallbackMessage: 0,
-    uEdge: 2,
-    rc: { left: 0, top: 0, right: 0, bottom: 0 },
-    lParam: 0
-  };
-
-  SHAppBarMessage(1, data); // ABM_REMOVE = 1
+const cleanupAppBar = () => {
+  if (mainWindow && !mainWindow.isDestroyed() && process.platform === 'win32' && SHAppBarMessage && isAppBarRegistered) {
+    try {
+      const hwnd = getWindowHwnd(mainWindow);
+      const uEdge = currentDockSide === 'left' ? ABE_LEFT : ABE_RIGHT;
+      callAppBar(ABM_REMOVE, hwnd, uEdge);
+    } catch (err) {
+      console.error('Failed to unregister AppBar on exit:', err);
+    }
+    isAppBarRegistered = false;
+    currentDockSide = null;
+  }
 };
 
 const createSpotlightWindow = (): void => {
@@ -190,6 +280,14 @@ ipcMain.on('quit-app', () => {
   app.quit();
 });
 
+ipcMain.on('dock-window', (event, side: 'left' | 'right') => {
+  dockWindow(side);
+});
+
+ipcMain.on('float-window', () => {
+  floatWindow();
+});
+
 ipcMain.on('toggle-always-on-top', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     const state = !mainWindow.isAlwaysOnTop();
@@ -207,13 +305,18 @@ ipcMain.handle('get-always-on-top', () => {
 
 const createWindow = (): void => {
   const dockWidth = 400;
+  const defaultHeight = 600;
 
-  // Create the browser window.
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { x, y, width, height } = primaryDisplay.workArea;
+
+  // Create the browser window in floating mode by default
   mainWindow = new BrowserWindow({
-    height: 600,
+    x: Math.round(x + (width - dockWidth) / 2),
+    y: Math.round(y + (height - defaultHeight) / 2),
+    height: defaultHeight,
     width: dockWidth,
-    maxWidth: dockWidth,
-    minWidth: dockWidth,
+    minWidth: 320,
     frame: false,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
@@ -223,33 +326,25 @@ const createWindow = (): void => {
   // and load the index.html of the app.
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
-  // Open the DevTools.
-  //mainWindow.webContents.openDevTools();
-
-  const hwnd = mainWindow.getNativeWindowHandle();
-
+  // Hook window message for position changes from Windows AppBar notifications
   if (process.platform === 'win32' && SHAppBarMessage) {
-    registerAppBar(hwnd, mainWindow);
-
-    mainWindow.on('closed', () => {
-      unregisterAppBar(hwnd);
-      mainWindow = null;
-    });
-  } else {
-    // Non-Windows platform: Position it on the right side of the monitor using the workArea
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { x, y, width: workAreaWidth, height: workAreaHeight } = primaryDisplay.workArea;
-    mainWindow.setBounds({
-      x: x + workAreaWidth - dockWidth,
-      y: y,
-      width: dockWidth,
-      height: workAreaHeight
-    });
-
-    mainWindow.on('closed', () => {
-      mainWindow = null;
+    mainWindow.hookWindowMessage(MY_APPBAR_MSG_ID, (wParam: Buffer) => {
+      const code = wParam.length === 8 ? wParam.readBigUInt64LE(0) : BigInt(wParam.readUInt32LE(0));
+      if (code === BigInt(ABN_POSCHANGED)) {
+        if (isAppBarRegistered && currentDockSide) {
+          dockWindow(currentDockSide);
+        }
+      }
     });
   }
+
+  mainWindow.on('close', () => {
+    cleanupAppBar();
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 };
 
 // This method will be called when Electron has finished
@@ -281,6 +376,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  cleanupAppBar();
   globalShortcut.unregisterAll();
 });
 

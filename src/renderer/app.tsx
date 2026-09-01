@@ -19,6 +19,8 @@ interface ElectronAPI {
   sendTaskCommand: (text: string) => void;
   hideSpotlight: () => void;
   quitApp: () => void;
+  dockWindow: (side: 'left' | 'right') => void;
+  floatWindow: () => void;
   onTaskAdded: (callback: (text: string) => void) => () => void;
   onSpotlightShown: (callback: () => void) => () => void;
   toggleAlwaysOnTop: () => void;
@@ -367,6 +369,22 @@ const MainApp = () => {
       return;
     }
 
+    // /dock [l[eft]|r[ight]]
+    const dockMatch = text.match(/^\/dock(?:\s+(l(?:eft)?|r(?:ight)?))?$/i);
+    if (dockMatch) {
+      const sideArg = dockMatch[1]?.toLowerCase();
+      const side: 'left' | 'right' = sideArg && (sideArg === 'l' || sideArg === 'left') ? 'left' : 'right';
+      window.api.dockWindow(side);
+      return;
+    }
+
+    // /float or /undock
+    const floatMatch = text.match(/^\/(?:float|undock)$/i);
+    if (floatMatch) {
+      window.api.floatWindow();
+      return;
+    }
+
     // /e[xit] or /q[uit]
     const exitMatch = text.match(/^\/(?:e(?:xit)?|q(?:uit)?)$/i);
     if (exitMatch) {
@@ -378,7 +396,7 @@ const MainApp = () => {
     const helpMatch = text.match(/^\/(?:h(?:elp)?|\?)$/i);
     if (helpMatch) {
       setWarning(
-        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /clear, /exit, /help'
+        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /undo, /important, /pin, /dock [l|r], /float, /clear, /exit, /help'
       );
       return;
     }
