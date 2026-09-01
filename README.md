@@ -17,6 +17,7 @@ Tasks automatically shift up like a conveyor belt as you complete them, and you 
   - `<text>`: Add task to the **bottom** of the queue.
   - `!<text>`: Add task as **next up** (index 1).
   - `!!<text>`: Insert task as the **current active task** (index 0), shifting the previous task down.
+- **Tag, Project & Mention Autocomplete**: Type `#` for tags, `$` for projects, or `@` for mentions and press `[Tab]` to autocomplete items from your custom `autocomplete.json` config.
 - **Demotion Block Guard**: Mark a task `/important` to lock it in the current slot. The app rejects any commands or prepends that would demote it until you toggle the lock off.
 - **Single-level Undo**: Revert any list modification command instantly.
 - **Automatic Persistence**: Tasks survive app restarts and reloads by automatically syncing to local storage.
@@ -40,6 +41,7 @@ Type any of the following commands in the Spotlight overlay or the sidebar foote
 | `/u[ndo]` | Undo Last Action | Reverts the previous command (1-level history depth). |
 | `/i[mportant]` | Toggle Urgent | Toggles important status on the current task (index 0). Styles it with a pulsing red card and blocks any demotion. |
 | `/p[in]` | Toggle Pin | Pinned/always-on-top toggle for the sidebar dock. |
+| `/config` or `/tags` | Open Autocomplete Config | Opens `autocomplete.json` in your default text editor. |
 | `/c[lear]` | Clear All | Clears all tasks from the conveyor belt. |
 | `/h[elp]` or `/?` | Help | Displays a help message in the sidebar listing available commands. |
 
