@@ -213,6 +213,11 @@ const floatWindow = () => {
     width: defaultWidth,
     height: defaultHeight
   });
+
+  if (mainWindow.isAlwaysOnTop()) {
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.webContents.send('always-on-top-changed', false);
+  }
 };
 
 const cleanupAppBar = () => {
