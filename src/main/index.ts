@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, globalShortcut, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, screen, globalShortcut, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
 import {
   loadAutocompleteConfig,
   openAutocompleteConfigFile,
@@ -26,6 +26,16 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  dialog.showErrorBox(
+    'Task Conveyor',
+    'Another instance of Task Conveyor is already running.'
+  );
+  app.quit();
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let SHAppBarMessage: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,6 +57,7 @@ const ABN_POSCHANGED = 1;
 
 let mainWindow: BrowserWindow | null = null;
 let spotlightWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let isAppBarRegistered = false;
 let currentDockSide: 'left' | 'right' | null = null;
 let activeHotkey: string | null = null;
@@ -58,7 +69,7 @@ interface RECTType {
   bottom: number;
 }
 
-if (process.platform === 'win32') {
+if (gotTheLock && process.platform === 'win32') {
   try {
     koffi = require('koffi');
 
@@ -281,6 +292,41 @@ const toggleSpotlightWindow = (): void => {
   }
 };
 
+const createTray = async (): Promise<void> => {
+  let icon: Electron.NativeImage;
+  try {
+    icon = await app.getFileIcon(process.execPath);
+  } catch {
+    icon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray.setToolTip('Task Conveyor');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Exit',
+      click: () => {
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+      mainWindow.focus();
+    }
+  });
+};
+
 // IPC Handlers
 ipcMain.on('submit-task', (event, text) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -370,6 +416,7 @@ const createWindow = (): void => {
     width: dockWidth,
     minWidth: 320,
     frame: false,
+    skipTaskbar: true,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
@@ -399,62 +446,81 @@ const createWindow = (): void => {
   });
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', () => {
-  createWindow();
-  createSpotlightWindow();
-
-  startWatchingAutocompleteConfig(() => {
-    broadcastAutocompleteUpdate([mainWindow, spotlightWindow]);
-  });
-
-  const config = loadConfig();
-  const targetHotkey = config.globalHotkey || DEFAULT_CONFIG.globalHotkey;
-  if (registerGlobalHotkey(targetHotkey)) {
-    activeHotkey = targetHotkey;
-  } else {
-    console.error(`Failed to register global hotkey "${targetHotkey}"`);
-    dialog.showErrorBox(
-      'Global Hotkey Error',
-      `Failed to register global hotkey "${targetHotkey}".\n\nIt may be invalid or already in use by another application.`
-    );
-  }
-
-  startWatchingConfig((newConfig) => {
-    const newHotkey = newConfig.globalHotkey || DEFAULT_CONFIG.globalHotkey;
-    if (newHotkey !== activeHotkey) {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('hotkey-config-changed', {
-          newHotkey,
-          activeHotkey: activeHotkey || ''
-        });
+if (gotTheLock) {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
       }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+      mainWindow.focus();
     }
   });
-});
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('will-quit', () => {
-  stopWatchingAutocompleteConfig();
-  stopWatchingConfig();
-  cleanupAppBar();
-  globalShortcut.unregisterAll();
-});
-
-app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
+  // This method will be called when Electron has finished
+  // initialization and is ready to create browser windows.
+  // Some APIs can only be used after this event occurs.
+  app.on('ready', async () => {
     createWindow();
-  }
-});
+    createSpotlightWindow();
+    await createTray();
+
+    startWatchingAutocompleteConfig(() => {
+      broadcastAutocompleteUpdate([mainWindow, spotlightWindow]);
+    });
+
+    const config = loadConfig();
+    const targetHotkey = config.globalHotkey || DEFAULT_CONFIG.globalHotkey;
+    if (registerGlobalHotkey(targetHotkey)) {
+      activeHotkey = targetHotkey;
+    } else {
+      console.error(`Failed to register global hotkey "${targetHotkey}"`);
+      dialog.showErrorBox(
+        'Global Hotkey Error',
+        `Failed to register global hotkey "${targetHotkey}".\n\nIt may be invalid or already in use by another application.`
+      );
+    }
+
+    startWatchingConfig((newConfig) => {
+      const newHotkey = newConfig.globalHotkey || DEFAULT_CONFIG.globalHotkey;
+      if (newHotkey !== activeHotkey) {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('hotkey-config-changed', {
+            newHotkey,
+            activeHotkey: activeHotkey || ''
+          });
+        }
+      }
+    });
+  });
+
+  // Quit when all windows are closed, except on macOS. There, it's common
+  // for applications and their menu bar to stay active until the user quits
+  // explicitly with Cmd + Q.
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+
+  app.on('will-quit', () => {
+    stopWatchingAutocompleteConfig();
+    stopWatchingConfig();
+    cleanupAppBar();
+    globalShortcut.unregisterAll();
+    if (tray && !tray.isDestroyed()) {
+      tray.destroy();
+      tray = null;
+    }
+  });
+
+  app.on('activate', () => {
+    // On OS X it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+}
