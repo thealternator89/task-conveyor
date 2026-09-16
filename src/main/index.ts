@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, globalShortcut, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, screen, globalShortcut, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
 import {
   loadAutocompleteConfig,
   openAutocompleteConfigFile,
@@ -57,6 +57,7 @@ const ABN_POSCHANGED = 1;
 
 let mainWindow: BrowserWindow | null = null;
 let spotlightWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let isAppBarRegistered = false;
 let currentDockSide: 'left' | 'right' | null = null;
 let activeHotkey: string | null = null;
@@ -291,6 +292,41 @@ const toggleSpotlightWindow = (): void => {
   }
 };
 
+const createTray = async (): Promise<void> => {
+  let icon: Electron.NativeImage;
+  try {
+    icon = await app.getFileIcon(process.execPath);
+  } catch {
+    icon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  tray.setToolTip('Task Conveyor');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Exit',
+      click: () => {
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+      }
+      mainWindow.focus();
+    }
+  });
+};
+
 // IPC Handlers
 ipcMain.on('submit-task', (event, text) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -380,6 +416,7 @@ const createWindow = (): void => {
     width: dockWidth,
     minWidth: 320,
     frame: false,
+    skipTaskbar: true,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
@@ -425,9 +462,10 @@ if (gotTheLock) {
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
-  app.on('ready', () => {
+  app.on('ready', async () => {
     createWindow();
     createSpotlightWindow();
+    await createTray();
 
     startWatchingAutocompleteConfig(() => {
       broadcastAutocompleteUpdate([mainWindow, spotlightWindow]);
@@ -472,6 +510,10 @@ if (gotTheLock) {
     stopWatchingConfig();
     cleanupAppBar();
     globalShortcut.unregisterAll();
+    if (tray && !tray.isDestroyed()) {
+      tray.destroy();
+      tray = null;
+    }
   });
 
   app.on('activate', () => {
