@@ -2,8 +2,11 @@ import { app, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export type ThemeMode = 'system' | 'light' | 'dark';
+
 export interface AppConfig {
   globalHotkey: string;
+  theme?: ThemeMode;
 }
 
 export const getDefaultHotkey = (): string => {
@@ -13,7 +16,8 @@ export const getDefaultHotkey = (): string => {
 export const DEFAULT_CONFIG: AppConfig = {
   get globalHotkey() {
     return getDefaultHotkey();
-  }
+  },
+  theme: 'system'
 };
 
 let fileWatcher: fs.FSWatcher | null = null;
@@ -54,12 +58,38 @@ export const loadConfig = (): AppConfig => {
         ? parsed.globalHotkey.trim()
         : DEFAULT_CONFIG.globalHotkey;
 
+    const theme: ThemeMode =
+      parsed?.theme === 'light' || parsed?.theme === 'dark' || parsed?.theme === 'system'
+        ? parsed.theme
+        : 'system';
+
     return {
-      globalHotkey
+      globalHotkey,
+      theme
     };
   } catch (err) {
     console.error('Error reading config.json:', err);
-    return { globalHotkey: getDefaultHotkey() };
+    return { globalHotkey: getDefaultHotkey(), theme: 'system' };
+  }
+};
+
+export const saveConfig = (partial: Partial<AppConfig>): AppConfig => {
+  const filePath = ensureConfigFile();
+  try {
+    let current: Record<string, unknown> = {};
+    if (fs.existsSync(filePath)) {
+      try {
+        current = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      } catch {
+        current = {};
+      }
+    }
+    const updated = { ...current, ...partial };
+    fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf-8');
+    return loadConfig();
+  } catch (err) {
+    console.error('Failed to write config.json:', err);
+    return loadConfig();
   }
 };
 
