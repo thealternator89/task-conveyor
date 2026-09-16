@@ -31,4 +31,12 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import './index.css';
 import './app';
 
+if (typeof window !== 'undefined' && window.api?.getTheme) {
+  window.api.getTheme().then((data) => {
+    if (data) {
+      document.documentElement.setAttribute('data-bs-theme', data.isDark ? 'dark' : 'light');
+    }
+  });
+}
+
 

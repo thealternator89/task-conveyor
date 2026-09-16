@@ -40,6 +40,9 @@ interface ElectronAPI {
   getAutocompleteData: () => Promise<AutocompleteConfig>;
   openAutocompleteConfig: () => Promise<void>;
   onAutocompleteUpdated: (callback: (data: AutocompleteConfig) => void) => () => void;
+  getTheme: () => Promise<{ theme: 'system' | 'light' | 'dark'; isDark: boolean }>;
+  setTheme: (theme: 'system' | 'light' | 'dark') => Promise<{ theme: 'system' | 'light' | 'dark'; isDark: boolean }>;
+  onThemeChanged: (callback: (data: { theme: 'system' | 'light' | 'dark'; isDark: boolean }) => void) => () => void;
 }
 
 declare global {
@@ -60,20 +63,9 @@ const getTagStyles = (tag: string) => {
   const hash = hashCode(tag);
   const hue = Math.abs(hash) % 360;
   
-  // High-contrast pastel HSL color scheme
-  const bg = `hsl(${hue}, 75%, 90%)`;
-  const text = `hsl(${hue}, 75%, 25%)`;
-  
   return {
-    backgroundColor: bg,
-    color: text,
-    padding: '0.1rem 0.35rem',
-    borderRadius: '4px',
-    fontSize: '0.85em',
-    fontWeight: 'bold' as const,
-    display: 'inline-block',
-    margin: '0 2px'
-  };
+    '--tag-hue': `${hue}`
+  } as React.CSSProperties;
 };
 
 const renderTaskTextWithTags = (text: string) => {
@@ -127,6 +119,23 @@ const SpotlightInput = () => {
 
     const unsubscribe = window.api.onAutocompleteUpdated((data) => {
       if (data) setAutocompleteConfig(data);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Sync theme
+  useEffect(() => {
+    window.api.getTheme().then((data) => {
+      if (data) {
+        document.documentElement.setAttribute('data-bs-theme', data.isDark ? 'dark' : 'light');
+      }
+    });
+
+    const unsubscribe = window.api.onThemeChanged((data) => {
+      if (data) {
+        document.documentElement.setAttribute('data-bs-theme', data.isDark ? 'dark' : 'light');
+      }
     });
 
     return unsubscribe;
@@ -312,10 +321,13 @@ const MainApp = () => {
   const [warning, setWarning] = useState<string | null>(null);
   const [hotkeyString, setHotkeyString] = useState<string>('');
   const [restartRequired, setRestartRequired] = useState(false);
+  const [isDark, setIsDark] = useState(false);
 
   // Sync refs to avoid stale closures in event listeners
   const tasksRef = useRef<TaskItem[]>(tasks);
   const historyRef = useRef<TaskItem[] | null>(history);
+  const isDarkRef = useRef(isDark);
+  isDarkRef.current = isDark;
 
   useEffect(() => {
     tasksRef.current = tasks;
@@ -334,6 +346,25 @@ const MainApp = () => {
   useEffect(() => {
     window.api.getInitialAlwaysOnTop().then(setAlwaysOnTop);
     const unsubscribe = window.api.onAlwaysOnTopChanged(setAlwaysOnTop);
+    return unsubscribe;
+  }, []);
+
+  // Sync theme
+  useEffect(() => {
+    window.api.getTheme().then((data) => {
+      if (data) {
+        setIsDark(data.isDark);
+        document.documentElement.setAttribute('data-bs-theme', data.isDark ? 'dark' : 'light');
+      }
+    });
+
+    const unsubscribe = window.api.onThemeChanged((data) => {
+      if (data) {
+        setIsDark(data.isDark);
+        document.documentElement.setAttribute('data-bs-theme', data.isDark ? 'dark' : 'light');
+      }
+    });
+
     return unsubscribe;
   }, []);
 
@@ -666,6 +697,31 @@ const MainApp = () => {
       return;
     }
 
+    // /theme [dark|light|system|auto] or /dark or /light
+    const themeMatch = text.match(/^\/theme(?:\s+(dark|light|system|auto))?$/i);
+    const darkMatch = text.match(/^\/dark$/i);
+    const lightMatch = text.match(/^\/light$/i);
+    if (themeMatch || darkMatch || lightMatch) {
+      let target: 'system' | 'light' | 'dark';
+      if (darkMatch) {
+        target = 'dark';
+      } else if (lightMatch) {
+        target = 'light';
+      } else if (themeMatch && themeMatch[1]) {
+        const arg = themeMatch[1].toLowerCase();
+        target = arg === 'auto' ? 'system' : (arg as 'system' | 'light' | 'dark');
+      } else {
+        // Toggle theme between dark and light
+        target = isDarkRef.current ? 'light' : 'dark';
+      }
+
+      window.api.setTheme(target).then((res) => {
+        const modeLabel = target === 'system' ? `system (${res.isDark ? 'dark' : 'light'})` : target;
+        setWarning(`Theme set to ${modeLabel}.`);
+      });
+      return;
+    }
+
     // /x or /exit or /q[uit]
     const exitMatch = text.match(/^\/(?:x|exit|q(?:uit)?)$/i);
     if (exitMatch) {
@@ -677,7 +733,7 @@ const MainApp = () => {
     const helpMatch = text.match(/^\/(?:h(?:elp)?|\?)$/i);
     if (helpMatch) {
       setWarning(
-        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /edit x text, /undo, /important, /pin, /dock [l|r], /float, /config, /tags, /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
+        'Commands: /done [b], /break, /move x y, /move x u|d [y], /remove x, /edit x text, /undo, /important, /pin, /dock [l|r], /float, /config, /tags, /theme [dark|light|system], /clear, /exit, /help (Use #tag, $project, @mention + [Tab])'
       );
       return;
     }
@@ -753,7 +809,7 @@ const MainApp = () => {
       <header className="sidebar-header d-flex align-items-center justify-content-between py-2">
         <div className="d-flex align-items-center gap-2">
           <img src={logoUrl} alt="Logo" style={{ height: '24px', objectFit: 'contain' }} />
-          <h5 className="mb-0 fw-bold text-dark">TaskConveyor</h5>
+          <h5 className="mb-0 fw-bold text-body">TaskConveyor</h5>
         </div>
         {alwaysOnTop && (
           <span className="badge bg-primary-subtle text-primary small" title="Pinned">
@@ -790,10 +846,10 @@ const MainApp = () => {
               </h3>
             </div>
           ) : (
-            <div className="p-4 text-center border rounded-3 bg-white text-muted shadow-sm">
+            <div className="p-4 text-center rounded-3 empty-task-card shadow-sm">
               <p className="mb-2">No active task</p>
               <small className="d-block text-muted">
-                Press <kbd>{hotkeyString || '...'}</kbd> to add a task.
+                Press <kbd className="kbd-shortcut">{hotkeyString || '...'}</kbd> to add a task.
               </small>
             </div>
           )}
@@ -820,7 +876,7 @@ const MainApp = () => {
               );
             })
           ) : (
-            <div className="p-3 text-center text-muted small border border-dashed rounded bg-white shadow-sm">
+            <div className="p-3 text-center small rounded empty-task-card-dashed shadow-sm">
               No tasks lined up
             </div>
           )}
@@ -828,7 +884,7 @@ const MainApp = () => {
       </div>
 
       {/* Footer input form */}
-      <footer className="p-3 bg-white border-top position-relative">
+      <footer className="p-3 sidebar-footer position-relative">
         {showSuggestions && (
           <AutocompletePopover
             matches={matches}
@@ -858,10 +914,10 @@ const MainApp = () => {
         </form>
         <div className="d-flex justify-content-between align-items-center mt-2">
           <span className="text-muted small">
-            Global Hotkey: <kbd className="bg-light text-dark border">{hotkeyString || '...'}</kbd>
+            Global Hotkey: <kbd className="kbd-shortcut">{hotkeyString || '...'}</kbd>
           </span>
           <span className="text-muted small">
-            Type <kbd className="bg-light text-dark border">/help</kbd> for commands
+            Type <kbd className="kbd-shortcut">/help</kbd> for commands
           </span>
         </div>
       </footer>

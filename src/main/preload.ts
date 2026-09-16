@@ -48,4 +48,13 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.removeListener('autocomplete-updated', subscription);
     };
   },
+  getTheme: () => ipcRenderer.invoke('get-theme'),
+  setTheme: (theme: 'system' | 'light' | 'dark') => ipcRenderer.invoke('set-theme', theme),
+  onThemeChanged: (callback: (data: { theme: 'system' | 'light' | 'dark'; isDark: boolean }) => void) => {
+    const subscription = (_event: unknown, data: { theme: 'system' | 'light' | 'dark'; isDark: boolean }) => callback(data);
+    ipcRenderer.on('theme-changed', subscription);
+    return () => {
+      ipcRenderer.removeListener('theme-changed', subscription);
+    };
+  },
 });
