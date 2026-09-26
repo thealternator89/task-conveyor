@@ -200,6 +200,8 @@ const dockWindow = (side: 'left' | 'right') => {
     mainWindow.setAlwaysOnTop(true);
     mainWindow.webContents.send('always-on-top-changed', true);
   }
+
+  mainWindow.setSkipTaskbar(true);
 };
 
 const floatWindow = () => {
@@ -231,6 +233,8 @@ const floatWindow = () => {
     mainWindow.setAlwaysOnTop(false);
     mainWindow.webContents.send('always-on-top-changed', false);
   }
+
+  mainWindow.setSkipTaskbar(false);
 };
 
 const cleanupAppBar = () => {
@@ -451,7 +455,7 @@ const createWindow = (): void => {
     width: dockWidth,
     minWidth: 320,
     frame: false,
-    skipTaskbar: true,
+    skipTaskbar: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141618' : '#f8f9fa',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
