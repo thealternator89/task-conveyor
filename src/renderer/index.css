@@ -35,6 +35,13 @@ html, body {
   border-bottom: 1px solid #dee2e6;
   background-color: #ffffff;
   -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.sidebar-header.is-docked {
+  -webkit-app-region: no-drag;
 }
 
 [data-bs-theme="dark"] .sidebar-header {

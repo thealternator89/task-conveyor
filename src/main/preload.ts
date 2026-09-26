@@ -6,6 +6,14 @@ contextBridge.exposeInMainWorld('api', {
   quitApp: () => ipcRenderer.send('quit-app'),
   dockWindow: (side: 'left' | 'right') => ipcRenderer.send('dock-window', side),
   floatWindow: () => ipcRenderer.send('float-window'),
+  getDockSide: () => ipcRenderer.invoke('get-dock-side'),
+  onDockChanged: (callback: (side: 'left' | 'right' | null) => void) => {
+    const subscription = (_event: unknown, side: 'left' | 'right' | null) => callback(side);
+    ipcRenderer.on('dock-changed', subscription);
+    return () => {
+      ipcRenderer.removeListener('dock-changed', subscription);
+    };
+  },
   onTaskAdded: (callback: (text: string) => void) => {
     const subscription = (_event: unknown, text: string) => callback(text);
     ipcRenderer.on('task-added', subscription);

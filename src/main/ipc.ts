@@ -17,6 +17,7 @@ export interface IpcHandlersContext {
   getSpotlightWindow: () => BrowserWindow | null;
   dockWindow: (side: 'left' | 'right') => void;
   floatWindow: () => void;
+  getDockSide?: () => 'left' | 'right' | null;
   getActiveHotkey: () => string | null;
 }
 
@@ -28,6 +29,7 @@ export type WindowTarget =
 
 const HANDLER_CHANNELS = [
   'get-always-on-top',
+  'get-dock-side',
   'get-autocomplete-data',
   'open-autocomplete-config',
   'get-config',
@@ -112,6 +114,13 @@ export const sendTaskAdded = (
   sendMessage(window, 'task-added', text);
 };
 
+export const sendDockChanged = (
+  window: BrowserWindow | null | undefined,
+  side: 'left' | 'right' | null
+): void => {
+  sendMessage(window, 'dock-changed', side);
+};
+
 export const unregisterIpcHandlers = (): void => {
   for (const channel of HANDLER_CHANNELS) {
     ipcMain.removeHandler(channel);
@@ -158,6 +167,10 @@ export const registerIpcHandlers = (context: IpcHandlersContext): void => {
   // Handlers (ipcMain.handle)
   ipcMain.handle('get-always-on-top', () => {
     return ifWindowExists(context.getMainWindow(), (win) => win.isAlwaysOnTop()) ?? false;
+  });
+
+  ipcMain.handle('get-dock-side', () => {
+    return context.getDockSide ? context.getDockSide() : null;
   });
 
   ipcMain.handle('get-autocomplete-data', () => {

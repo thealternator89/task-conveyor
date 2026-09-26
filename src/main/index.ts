@@ -29,6 +29,7 @@ import {
   restoreMainWindow,
   getMainWindow,
   getSpotlightWindow,
+  getCurrentDockSide,
   getAppWindows,
   getAppIcon
 } from './window';
@@ -138,6 +139,7 @@ if (gotTheLock) {
       getSpotlightWindow,
       dockWindow: dockMainWindow,
       floatWindow: floatMainWindow,
+      getDockSide: getCurrentDockSide,
       getActiveHotkey: () => activeHotkey,
     });
 

@@ -28,6 +28,8 @@ interface ElectronAPI {
   quitApp: () => void;
   dockWindow: (side: 'left' | 'right') => void;
   floatWindow: () => void;
+  getDockSide: () => Promise<'left' | 'right' | null>;
+  onDockChanged: (callback: (side: 'left' | 'right' | null) => void) => () => void;
   onTaskAdded: (callback: (text: string) => void) => () => void;
   onSpotlightShown: (callback: () => void) => () => void;
   toggleAlwaysOnTop: () => void;
@@ -307,6 +309,7 @@ const MainApp = () => {
   });
 
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  const [dockSide, setDockSide] = useState<'left' | 'right' | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [autocompleteConfig, setAutocompleteConfig] = useState<AutocompleteConfig>({
     tags: [],
@@ -346,6 +349,13 @@ const MainApp = () => {
   useEffect(() => {
     window.api.getInitialAlwaysOnTop().then(setAlwaysOnTop);
     const unsubscribe = window.api.onAlwaysOnTopChanged(setAlwaysOnTop);
+    return unsubscribe;
+  }, []);
+
+  // Sync dock state
+  useEffect(() => {
+    window.api.getDockSide().then(setDockSide);
+    const unsubscribe = window.api.onDockChanged(setDockSide);
     return unsubscribe;
   }, []);
 
@@ -806,7 +816,7 @@ const MainApp = () => {
   return (
     <div className="sidebar-container">
       {/* Header */}
-      <header className="sidebar-header d-flex align-items-center justify-content-between py-2">
+      <header className={`sidebar-header d-flex align-items-center justify-content-between py-2 ${dockSide ? 'is-docked' : ''}`}>
         <div className="d-flex align-items-center gap-2">
           <img src={logoUrl} alt="TaskConveyor Logo" style={{ height: '24px', objectFit: 'contain' }} />
           <h5 className="mb-0 fw-bold text-body">TaskConveyor</h5>
