@@ -1,4 +1,6 @@
 import { app, BrowserWindow, screen, globalShortcut, ipcMain, dialog, Tray, Menu, nativeImage, nativeTheme } from 'electron';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
   loadAutocompleteConfig,
   openAutocompleteConfigFile,
@@ -260,8 +262,34 @@ const broadcastThemeUpdate = (): void => {
   }
 };
 
+const getAppIcon = (): Electron.NativeImage => {
+  const iconFileName = process.platform === 'darwin' ? 'icon.icns' : 'icon.ico';
+  const candidatePaths = [
+    path.join(process.resourcesPath, 'assets', iconFileName),
+    path.join(app.getAppPath(), 'assets', iconFileName),
+    path.join(__dirname, '../../assets', iconFileName),
+    // Fallback to alternative format if preferred platform format isn't found
+    path.join(process.resourcesPath, 'assets', process.platform === 'darwin' ? 'icon.ico' : 'icon.icns'),
+    path.join(app.getAppPath(), 'assets', process.platform === 'darwin' ? 'icon.ico' : 'icon.icns'),
+    path.join(__dirname, '../../assets', process.platform === 'darwin' ? 'icon.ico' : 'icon.icns'),
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      const img = nativeImage.createFromPath(candidate);
+      if (!img.isEmpty()) {
+        return img;
+      }
+    }
+  }
+
+  return nativeImage.createEmpty();
+};
+
 const createSpotlightWindow = (): void => {
   if (spotlightWindow) return;
+
+  const appIcon = getAppIcon();
 
   spotlightWindow = new BrowserWindow({
     width: 500,
@@ -272,6 +300,7 @@ const createSpotlightWindow = (): void => {
     show: false,
     resizable: false,
     skipTaskbar: true,
+    icon: appIcon.isEmpty() ? undefined : appIcon,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e2124' : '#ffffff',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
@@ -309,14 +338,21 @@ const toggleSpotlightWindow = (): void => {
 };
 
 const createTray = async (): Promise<void> => {
-  let icon: Electron.NativeImage;
-  try {
-    icon = await app.getFileIcon(process.execPath);
-  } catch {
-    icon = nativeImage.createEmpty();
+  let icon = getAppIcon();
+  if (icon.isEmpty()) {
+    try {
+      icon = await app.getFileIcon(process.execPath);
+    } catch {
+      icon = nativeImage.createEmpty();
+    }
   }
 
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
+  const trayIcon = icon.resize({ width: 16, height: 16 });
+  // Explicitly ensure the icon is not treated as a template mask on macOS,
+  // preserving its full colors in the menu bar.
+  trayIcon.setTemplateImage(false);
+
+  tray = new Tray(trayIcon);
   tray.setToolTip('Task Conveyor');
 
   const contextMenu = Menu.buildFromTemplate([
@@ -443,6 +479,8 @@ const createWindow = (): void => {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { x, y, width, height } = primaryDisplay.workArea;
 
+  const appIcon = getAppIcon();
+
   // Create the browser window in floating mode by default
   mainWindow = new BrowserWindow({
     x: Math.round(x + (width - dockWidth) / 2),
@@ -452,6 +490,7 @@ const createWindow = (): void => {
     minWidth: 320,
     frame: false,
     skipTaskbar: true,
+    icon: appIcon.isEmpty() ? undefined : appIcon,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#141618' : '#f8f9fa',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
@@ -505,6 +544,11 @@ if (gotTheLock) {
     nativeTheme.on('updated', () => {
       broadcastThemeUpdate();
     });
+
+    const appIcon = getAppIcon();
+    if (process.platform === 'darwin' && app.dock && !appIcon.isEmpty()) {
+      app.dock.setIcon(appIcon);
+    }
 
     createWindow();
     createSpotlightWindow();
