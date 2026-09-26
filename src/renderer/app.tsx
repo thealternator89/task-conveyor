@@ -299,7 +299,7 @@ const SpotlightInput = () => {
 const MainApp = () => {
   const [tasks, setTasks] = useState<TaskItem[]>(() => {
     try {
-      const stored = localStorage.getItem('task-conveyor-tasks');
+      const stored = localStorage.getItem('taskconveyor-tasks') || localStorage.getItem('task-conveyor-tasks');
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -339,7 +339,7 @@ const MainApp = () => {
 
   // Sync to local storage
   useEffect(() => {
-    localStorage.setItem('task-conveyor-tasks', JSON.stringify(tasks));
+    localStorage.setItem('taskconveyor-tasks', JSON.stringify(tasks));
   }, [tasks]);
 
   // Sync always-on-top state
@@ -808,7 +808,7 @@ const MainApp = () => {
       {/* Header */}
       <header className="sidebar-header d-flex align-items-center justify-content-between py-2">
         <div className="d-flex align-items-center gap-2">
-          <img src={logoUrl} alt="Logo" style={{ height: '24px', objectFit: 'contain' }} />
+          <img src={logoUrl} alt="TaskConveyor Logo" style={{ height: '24px', objectFit: 'contain' }} />
           <h5 className="mb-0 fw-bold text-body">TaskConveyor</h5>
         </div>
         {alwaysOnTop && (

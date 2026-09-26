@@ -30,12 +30,38 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+app.name = 'TaskConveyor';
+
+// Migrate user data from legacy 'task-conveyor' directory if necessary
+try {
+  const newUserData = app.getPath('userData');
+  const appData = app.getPath('appData');
+  const oldUserData = path.join(appData, 'task-conveyor');
+
+  if (fs.existsSync(oldUserData)) {
+    if (!fs.existsSync(newUserData)) {
+      fs.cpSync(oldUserData, newUserData, { recursive: true });
+    } else {
+      const filesToMigrate = ['config.json', 'autocomplete.json'];
+      for (const file of filesToMigrate) {
+        const oldFile = path.join(oldUserData, file);
+        const newFile = path.join(newUserData, file);
+        if (fs.existsSync(oldFile) && !fs.existsSync(newFile)) {
+          fs.copyFileSync(oldFile, newFile);
+        }
+      }
+    }
+  }
+} catch (err) {
+  console.error('Failed to migrate userData from task-conveyor to TaskConveyor:', err);
+}
+
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   dialog.showErrorBox(
-    'Task Conveyor',
-    'Another instance of Task Conveyor is already running.'
+    'TaskConveyor',
+    'Another instance of TaskConveyor is already running.'
   );
   app.quit();
 }
@@ -292,6 +318,7 @@ const createSpotlightWindow = (): void => {
   const appIcon = getAppIcon();
 
   spotlightWindow = new BrowserWindow({
+    title: 'TaskConveyor',
     width: 500,
     height: 72,
     frame: false,
@@ -353,7 +380,7 @@ const createTray = async (): Promise<void> => {
   trayIcon.setTemplateImage(false);
 
   tray = new Tray(trayIcon);
-  tray.setToolTip('Task Conveyor');
+  tray.setToolTip('TaskConveyor');
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -483,6 +510,7 @@ const createWindow = (): void => {
 
   // Create the browser window in floating mode by default
   mainWindow = new BrowserWindow({
+    title: 'TaskConveyor',
     x: Math.round(x + (width - dockWidth) / 2),
     y: Math.round(y + (height - defaultHeight) / 2),
     height: defaultHeight,
