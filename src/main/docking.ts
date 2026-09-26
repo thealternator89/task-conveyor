@@ -91,7 +91,6 @@ export const dockWindow = (mainWindow: BrowserWindow | null, side: DockSide): vo
         mainWindow.setAlwaysOnTop(true);
         mainWindow.webContents.send('always-on-top-changed', true);
       }
-      mainWindow.setSkipTaskbar(true);
 
       mainWindow.setBounds(finalBounds);
       currentDockSide = side;
@@ -103,7 +102,6 @@ export const dockWindow = (mainWindow: BrowserWindow | null, side: DockSide): vo
         mainWindow.setAlwaysOnTop(true);
         mainWindow.webContents.send('always-on-top-changed', true);
       }
-      mainWindow.setSkipTaskbar(true);
 
       mainWindow.setBounds({
         x: side === 'left' ? x : x + workAreaWidth - dockWidth,
@@ -140,7 +138,6 @@ export const floatWindow = (mainWindow: BrowserWindow | null): void => {
       mainWindow.setAlwaysOnTop(false);
       mainWindow.webContents.send('always-on-top-changed', false);
     }
-    mainWindow.setSkipTaskbar(false);
 
     const currentBounds = mainWindow.getBounds();
     const display = screen.getDisplayMatching(currentBounds);
