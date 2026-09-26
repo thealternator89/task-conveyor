@@ -20,6 +20,12 @@ export interface IpcHandlersContext {
   getActiveHotkey: () => string | null;
 }
 
+export type WindowTarget =
+  | BrowserWindow
+  | null
+  | undefined
+  | Array<BrowserWindow | null | undefined>;
+
 const HANDLER_CHANNELS = [
   'get-always-on-top',
   'get-autocomplete-data',
@@ -40,6 +46,35 @@ const LISTENER_CHANNELS = [
   'toggle-always-on-top',
 ] as const;
 
+/**
+ * Executes an action on a window only if it exists and has not been destroyed.
+ */
+export const ifWindowExists = <T>(
+  window: BrowserWindow | null | undefined,
+  action: (win: BrowserWindow) => T
+): T | undefined => {
+  if (window && !window.isDestroyed()) {
+    return action(window);
+  }
+  return undefined;
+};
+
+/**
+ * Sends an IPC message to one or more windows, safely verifying each window exists and is not destroyed.
+ */
+export const sendMessage = (
+  target: WindowTarget,
+  channel: string,
+  ...args: unknown[]
+): void => {
+  const windows = Array.isArray(target) ? target : [target];
+  for (const win of windows) {
+    ifWindowExists(win, (w) => {
+      w.webContents.send(channel, ...args);
+    });
+  }
+};
+
 export const broadcastThemeUpdate = (
   windows: Array<BrowserWindow | null | undefined>
 ): void => {
@@ -47,46 +82,34 @@ export const broadcastThemeUpdate = (
     theme: (nativeTheme.themeSource || 'system') as ThemeMode,
     isDark: nativeTheme.shouldUseDarkColors
   };
-  for (const win of windows) {
-    if (win && !win.isDestroyed()) {
-      win.webContents.send('theme-changed', data);
-    }
-  }
+  sendMessage(windows, 'theme-changed', data);
 };
 
 export const sendAlwaysOnTopChanged = (
   window: BrowserWindow | null | undefined,
   state: boolean
 ): void => {
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('always-on-top-changed', state);
-  }
+  sendMessage(window, 'always-on-top-changed', state);
 };
 
 export const sendSpotlightShown = (
   window: BrowserWindow | null | undefined
 ): void => {
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('spotlight-shown');
-  }
+  sendMessage(window, 'spotlight-shown');
 };
 
 export const sendHotkeyConfigChanged = (
   window: BrowserWindow | null | undefined,
   data: { newHotkey: string; activeHotkey: string }
 ): void => {
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('hotkey-config-changed', data);
-  }
+  sendMessage(window, 'hotkey-config-changed', data);
 };
 
 export const sendTaskAdded = (
   window: BrowserWindow | null | undefined,
   text: string
 ): void => {
-  if (window && !window.isDestroyed()) {
-    window.webContents.send('task-added', text);
-  }
+  sendMessage(window, 'task-added', text);
 };
 
 export const unregisterIpcHandlers = (): void => {
@@ -104,20 +127,12 @@ export const registerIpcHandlers = (context: IpcHandlersContext): void => {
 
   // Listeners (ipcMain.on)
   ipcMain.on('submit-task', (_event, text: string) => {
-    const mainWindow = context.getMainWindow();
-    sendTaskAdded(mainWindow, text);
-
-    const spotlightWindow = context.getSpotlightWindow();
-    if (spotlightWindow && !spotlightWindow.isDestroyed()) {
-      spotlightWindow.hide();
-    }
+    sendTaskAdded(context.getMainWindow(), text);
+    ifWindowExists(context.getSpotlightWindow(), (win) => win.hide());
   });
 
   ipcMain.on('hide-spotlight', () => {
-    const spotlightWindow = context.getSpotlightWindow();
-    if (spotlightWindow && !spotlightWindow.isDestroyed()) {
-      spotlightWindow.hide();
-    }
+    ifWindowExists(context.getSpotlightWindow(), (win) => win.hide());
   });
 
   ipcMain.on('quit-app', () => {
@@ -133,21 +148,16 @@ export const registerIpcHandlers = (context: IpcHandlersContext): void => {
   });
 
   ipcMain.on('toggle-always-on-top', () => {
-    const mainWindow = context.getMainWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const state = !mainWindow.isAlwaysOnTop();
-      mainWindow.setAlwaysOnTop(state);
-      sendAlwaysOnTopChanged(mainWindow, state);
-    }
+    ifWindowExists(context.getMainWindow(), (win) => {
+      const state = !win.isAlwaysOnTop();
+      win.setAlwaysOnTop(state);
+      sendAlwaysOnTopChanged(win, state);
+    });
   });
 
   // Handlers (ipcMain.handle)
   ipcMain.handle('get-always-on-top', () => {
-    const mainWindow = context.getMainWindow();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      return mainWindow.isAlwaysOnTop();
-    }
-    return false;
+    return ifWindowExists(context.getMainWindow(), (win) => win.isAlwaysOnTop()) ?? false;
   });
 
   ipcMain.handle('get-autocomplete-data', () => {
