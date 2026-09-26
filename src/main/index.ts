@@ -101,12 +101,20 @@ if (gotTheLock) {
     }
   });
 
+  app.on('before-quit', () => {
+    cleanupAppBar(getMainWindow());
+  });
+
   app.on('will-quit', () => {
     stopWatchingAutocompleteConfig();
     stopWatchingConfig();
     cleanupAppBar(getMainWindow());
     unregisterAllHotkeys();
     destroyTray();
+  });
+
+  process.on('exit', () => {
+    cleanupAppBar();
   });
 
   app.on('activate', () => {
