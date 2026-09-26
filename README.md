@@ -1,6 +1,6 @@
-# Task Conveyor
+# TaskConveyor
 
-Task Conveyor is a sleek, always-on task manager that docks to the side of your display. Designed for developers and power users, the app features a completely **keyboard-driven, button-free user interface** controlled via a global hotkey-activated Spotlight overlay or a footer command bar.
+TaskConveyor is a sleek, always-on task manager that docks to the side of your display. Designed for developers and power users, the app features a completely **keyboard-driven, button-free user interface** controlled via a global hotkey-activated Spotlight overlay or a footer command bar.
 
 Tasks automatically shift up like a conveyor belt as you complete them, and you can safeguard urgent items using the built-in demotion blocker.
 
@@ -47,7 +47,7 @@ Type any of the following commands in the Spotlight overlay or the sidebar foote
 | `/config` | Open App Config | Opens general `config.json` (e.g. `globalHotkey`, `theme`) in your default text editor. |
 | `/tags` or `/autocomplete` | Open Autocomplete Config | Opens `autocomplete.json` in your default text editor. |
 | `/c[lear]` | Clear All | Clears all tasks from the conveyor belt. |
-| `/x` or `/exit` or `/q[uit]` | Exit App | Quits and closes Task Conveyor. |
+| `/x` or `/exit` or `/q[uit]` | Exit App | Quits and closes TaskConveyor. |
 | `/h[elp]` or `/?` | Help | Displays a help message in the sidebar listing available commands. |
 
 ---

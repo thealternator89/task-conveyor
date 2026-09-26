@@ -1,6 +1,6 @@
 {
   "name": "task-conveyor",
-  "productName": "task-conveyor",
+  "productName": "TaskConveyor",
   "version": "1.0.0",
   "description": "My Electron application description",
   "main": ".webpack/main",

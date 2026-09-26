@@ -37,6 +37,16 @@ export const ensureConfigFile = (): string => {
   }
 
   if (!fs.existsSync(filePath)) {
+    const legacyPath = path.join(app.getPath('appData'), 'task-conveyor', 'config.json');
+    if (fs.existsSync(legacyPath)) {
+      try {
+        fs.copyFileSync(legacyPath, filePath);
+        return filePath;
+      } catch {
+        // Fallback to default
+      }
+    }
+
     try {
       fs.writeFileSync(filePath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8');
     } catch (err) {

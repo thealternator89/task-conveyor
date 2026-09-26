@@ -14,6 +14,8 @@ import { rendererConfig } from './webpack.renderer.config';
 
 const config: ForgeConfig = {
   packagerConfig: {
+    name: 'TaskConveyor',
+    executableName: 'TaskConveyor',
     asar: true,
     icon: path.resolve(__dirname, 'assets/icon'),
     extraResource: [path.resolve(__dirname, 'assets')],
