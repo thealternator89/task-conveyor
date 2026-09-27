@@ -146,84 +146,87 @@ export const restoreMainWindow = (): void => {
   }
 };
 
+let isDocking = false;
+
 export const dockMainWindow = (side: DockSide): void => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!mainWindow || mainWindow.isDestroyed() || isDocking) return;
+  isDocking = true;
 
-  const uEdge = side === 'left' ? ABE_LEFT : ABE_RIGHT;
-  const currentBounds = mainWindow.getBounds();
-  const display = screen.getDisplayMatching(currentBounds);
-  const scale = display.scaleFactor || 1;
-  const dockWidth = 400;
+  try {
+    const uEdge = side === 'left' ? ABE_LEFT : ABE_RIGHT;
+    const currentBounds = mainWindow.getBounds();
+    const display = screen.getDisplayMatching(currentBounds);
+    const scale = display.scaleFactor || 1;
+    const dockWidth = 400;
 
-  if (process.platform === 'win32' && SHAppBarMessage) {
-    const hwnd = getWindowHwnd(mainWindow);
+    if (process.platform === 'win32' && SHAppBarMessage) {
+      const hwnd = getWindowHwnd(mainWindow);
 
-    // If not registered yet, register as an AppBar
-    if (!isAppBarRegistered) {
-      callAppBar(ABM_NEW, hwnd, uEdge);
-      isAppBarRegistered = true;
-    }
+      // If not registered yet, register as an AppBar
+      if (!isAppBarRegistered) {
+        callAppBar(ABM_NEW, hwnd, uEdge);
+        isAppBarRegistered = true;
+      }
 
-    // Convert display bounds to physical pixels for Win32 API
-    const monLeftPhysical = Math.round(display.bounds.x * scale);
-    const monTopPhysical = Math.round(display.bounds.y * scale);
-    const monRightPhysical = Math.round((display.bounds.x + display.bounds.width) * scale);
-    const monBottomPhysical = Math.round((display.bounds.y + display.bounds.height) * scale);
-    const dockWidthPhysical = Math.round(dockWidth * scale);
+      // Convert display bounds to physical pixels for Win32 API
+      const monLeftPhysical = Math.round(display.bounds.x * scale);
+      const monTopPhysical = Math.round(display.bounds.y * scale);
+      const monRightPhysical = Math.round((display.bounds.x + display.bounds.width) * scale);
+      const monBottomPhysical = Math.round((display.bounds.y + display.bounds.height) * scale);
+      const dockWidthPhysical = Math.round(dockWidth * scale);
 
-    const initialRc: RECTType = {
-      left: side === 'left' ? monLeftPhysical : monRightPhysical - dockWidthPhysical,
-      top: monTopPhysical,
-      right: side === 'left' ? monLeftPhysical + dockWidthPhysical : monRightPhysical,
-      bottom: monBottomPhysical
-    };
+      const initialRc: RECTType = {
+        left: side === 'left' ? monLeftPhysical : monRightPhysical - dockWidthPhysical,
+        top: monTopPhysical,
+        right: side === 'left' ? monLeftPhysical + dockWidthPhysical : monRightPhysical,
+        bottom: monBottomPhysical
+      };
 
-    // ABM_QUERYPOS: request position
-    const queryResult = callAppBar(ABM_QUERYPOS, hwnd, uEdge, initialRc);
+      // ABM_QUERYPOS: request position
+      const queryResult = callAppBar(ABM_QUERYPOS, hwnd, uEdge, initialRc);
 
-    // Maintain requested width on the chosen edge
-    const adjustedRc: RECTType = { ...queryResult.rc };
-    if (uEdge === ABE_LEFT) {
-      adjustedRc.right = adjustedRc.left + dockWidthPhysical;
+      // Maintain requested width on the chosen edge
+      const adjustedRc: RECTType = { ...queryResult.rc };
+      if (uEdge === ABE_LEFT) {
+        adjustedRc.right = adjustedRc.left + dockWidthPhysical;
+      } else {
+        adjustedRc.left = adjustedRc.right - dockWidthPhysical;
+      }
+
+      // ABM_SETPOS: reserve space in the OS desktop work area
+      const setPosResult = callAppBar(ABM_SETPOS, hwnd, uEdge, adjustedRc);
+
+      // Convert result back from physical pixels to DIPs for Electron
+      const finalBounds = {
+        x: Math.round(setPosResult.rc.left / scale),
+        y: Math.round(setPosResult.rc.top / scale),
+        width: Math.round((setPosResult.rc.right - setPosResult.rc.left) / scale),
+        height: Math.round((setPosResult.rc.bottom - setPosResult.rc.top) / scale)
+      };
+
+      mainWindow.setBounds(finalBounds);
+      currentDockSide = side;
     } else {
-      adjustedRc.left = adjustedRc.right - dockWidthPhysical;
+      // Non-Windows fallback
+      const { x, y, width: workAreaWidth, height: workAreaHeight } = display.workArea;
+      mainWindow.setBounds({
+        x: side === 'left' ? x : x + workAreaWidth - dockWidth,
+        y: y,
+        width: dockWidth,
+        height: workAreaHeight
+      });
+      currentDockSide = side;
     }
 
-    // ABM_SETPOS: reserve space in the OS desktop work area
-    const setPosResult = callAppBar(ABM_SETPOS, hwnd, uEdge, adjustedRc);
+    if (!mainWindow.isAlwaysOnTop()) {
+      mainWindow.setAlwaysOnTop(true);
+      sendAlwaysOnTopChanged(mainWindow, true);
+    }
 
-    // Convert result back from physical pixels to DIPs for Electron
-    const finalBounds = {
-      x: Math.round(setPosResult.rc.left / scale),
-      y: Math.round(setPosResult.rc.top / scale),
-      width: Math.round((setPosResult.rc.right - setPosResult.rc.left) / scale),
-      height: Math.round((setPosResult.rc.bottom - setPosResult.rc.top) / scale)
-    };
-
-    mainWindow.setBounds(finalBounds);
-    currentDockSide = side;
-  } else {
-    // Non-Windows fallback
-    const { x, y, width: workAreaWidth, height: workAreaHeight } = display.workArea;
-    mainWindow.setBounds({
-      x: side === 'left' ? x : x + workAreaWidth - dockWidth,
-      y: y,
-      width: dockWidth,
-      height: workAreaHeight
-    });
-    currentDockSide = side;
+    sendDockChanged(mainWindow, side);
+  } finally {
+    isDocking = false;
   }
-
-  if (typeof mainWindow.setMovable === 'function') {
-    mainWindow.setMovable(false);
-  }
-
-  if (!mainWindow.isAlwaysOnTop()) {
-    mainWindow.setAlwaysOnTop(true);
-    sendAlwaysOnTopChanged(mainWindow, true);
-  }
-
-  sendDockChanged(mainWindow, side);
 };
 
 export const floatMainWindow = (): void => {
@@ -237,10 +240,6 @@ export const floatMainWindow = (): void => {
   }
 
   currentDockSide = null;
-
-  if (typeof mainWindow.setMovable === 'function') {
-    mainWindow.setMovable(true);
-  }
 
   const currentBounds = mainWindow.getBounds();
   const display = screen.getDisplayMatching(currentBounds);
@@ -280,10 +279,6 @@ export const cleanupAppBar = (): void => {
     }
     isAppBarRegistered = false;
     currentDockSide = null;
-  }
-
-  if (mainWindow && !mainWindow.isDestroyed() && typeof mainWindow.setMovable === 'function') {
-    mainWindow.setMovable(true);
   }
 };
 
