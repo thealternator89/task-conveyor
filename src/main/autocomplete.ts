@@ -6,12 +6,16 @@ export interface AutocompleteConfig {
   tags: string[];
   projects: string[];
   mentions: string[];
+  expansions: Record<string, string>;
 }
 
 const DEFAULT_CONFIG: AutocompleteConfig = {
   tags: [],
   projects: [],
-  mentions: []
+  mentions: [],
+  expansions: {
+    rpr: 'review PR'
+  }
 };
 
 let fileWatcher: fs.FSWatcher | null = null;
@@ -35,12 +39,24 @@ export const ensureAutocompleteFile = (): string => {
     if (fs.existsSync(legacyPath)) {
       try {
         fs.copyFileSync(legacyPath, filePath);
-        return filePath;
       } catch {
         // Fallback to default
       }
     }
+  }
 
+  if (fs.existsSync(filePath)) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !('expansions' in parsed)) {
+        parsed.expansions = { rpr: 'review PR' };
+        fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2), 'utf-8');
+      }
+    } catch {
+      // Ignore if unparseable, will be handled during load
+    }
+  } else {
     try {
       fs.writeFileSync(filePath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8');
     } catch (err) {
@@ -70,6 +86,22 @@ const sanitizeList = (arr: unknown): string[] => {
   return result;
 };
 
+const sanitizeExpansions = (obj: unknown): Record<string, string> => {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof key === 'string' && typeof value === 'string') {
+      const trimmedKey = key.trim();
+      const trimmedValue = value.trim();
+      if (trimmedKey && trimmedValue) {
+        result[trimmedKey] = trimmedValue;
+      }
+    }
+  }
+  return result;
+};
+
 export const loadAutocompleteConfig = (): AutocompleteConfig => {
   const filePath = ensureAutocompleteFile();
   try {
@@ -79,7 +111,8 @@ export const loadAutocompleteConfig = (): AutocompleteConfig => {
     return {
       tags: sanitizeList(parsed.tags),
       projects: sanitizeList(parsed.projects),
-      mentions: sanitizeList(parsed.mentions)
+      mentions: sanitizeList(parsed.mentions),
+      expansions: sanitizeExpansions(parsed.expansions)
     };
   } catch (err) {
     console.error('Error reading autocomplete.json:', err);

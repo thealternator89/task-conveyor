@@ -18,6 +18,7 @@ Tasks automatically shift up like a conveyor belt as you complete them, and you 
   - `!<text>`: Add task as **next up** (index 1).
   - `!!<text>`: Insert task as the **current active task** (index 0), shifting the previous task down.
 - **Tag, Project & Mention Autocomplete**: Type `#` for tags, `$` for projects, or `@` for mentions and press `[Tab]` to autocomplete items from your custom `autocomplete.json` config via `/tags`.
+- **Text Expansions**: Configure shortcut terms (e.g. `"rpr": "review PR"`) in `autocomplete.json` via `/tags`. Type the shortcut and press `[Space]` to instantly expand it. When entered as the first word, expansions are case-insensitive and adhere to the auto-capitalization rule (e.g. `Rpr` expands to `Review PR`). Subsquent occurrences expand case-sensitively.
 - **Demotion Block Guard**: Mark a task `/important` to lock it in the current slot. The app rejects any commands or prepends that would demote it until you toggle the lock off.
 - **Dark Mode Support**: Seamlessly follows your OS appearance by default (`system`), or toggle/set `dark` or `light` mode anytime via `/theme [dark|light|system]`, `/dark`, or `/light`.
 - **Single-level Undo**: Revert any list modification command instantly.
