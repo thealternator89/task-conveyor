@@ -2,6 +2,7 @@ export interface AutocompleteConfig {
   tags: string[];
   projects: string[];
   mentions: string[];
+  expansions?: Record<string, string>;
 }
 
 export type AutocompleteType = 'tag' | 'project' | 'mention';

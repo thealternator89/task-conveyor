@@ -49,8 +49,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   getAutocompleteData: () => ipcRenderer.invoke('get-autocomplete-data'),
   openAutocompleteConfig: () => ipcRenderer.invoke('open-autocomplete-config'),
-  onAutocompleteUpdated: (callback: (data: { tags: string[]; projects: string[]; mentions: string[] }) => void) => {
-    const subscription = (_event: unknown, data: { tags: string[]; projects: string[]; mentions: string[] }) => callback(data);
+  onAutocompleteUpdated: (callback: (data: { tags: string[]; projects: string[]; mentions: string[]; expansions?: Record<string, string> }) => void) => {
+    const subscription = (_event: unknown, data: { tags: string[]; projects: string[]; mentions: string[]; expansions?: Record<string, string> }) => callback(data);
     ipcRenderer.on('autocomplete-updated', subscription);
     return () => {
       ipcRenderer.removeListener('autocomplete-updated', subscription);

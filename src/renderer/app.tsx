@@ -13,6 +13,7 @@ import {
   applyCompletion
 } from './autocomplete';
 import { AutocompletePopover } from './AutocompletePopover';
+import { expandOnSpace } from './expansions';
 
 interface TaskItem {
   id: string;
@@ -106,7 +107,8 @@ const SpotlightInput = () => {
   const [autocompleteConfig, setAutocompleteConfig] = useState<AutocompleteConfig>({
     tags: [],
     projects: [],
-    mentions: []
+    mentions: [],
+    expansions: {}
   });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -200,6 +202,27 @@ const SpotlightInput = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === ' ' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing) {
+      const input = inputRef.current;
+      if (input && input.selectionStart === input.selectionEnd) {
+        const caret = input.selectionStart ?? value.length;
+        const result = expandOnSpace(value, caret, autocompleteConfig.expansions);
+        if (result.expanded) {
+          e.preventDefault();
+          setValue(result.newText);
+          setCaretPos(result.newCaretPos);
+          setDismissed(false);
+          setSelectedIndex(0);
+          setTimeout(() => {
+            if (inputRef.current) {
+              inputRef.current.focus();
+              inputRef.current.setSelectionRange(result.newCaretPos, result.newCaretPos);
+            }
+          }, 0);
+          return;
+        }
+      }
+    }
     if (e.key === 'Tab' && showSuggestions && activeMatch) {
       e.preventDefault();
       handleSelectSuggestion(activeMatch);
@@ -314,7 +337,8 @@ const MainApp = () => {
   const [autocompleteConfig, setAutocompleteConfig] = useState<AutocompleteConfig>({
     tags: [],
     projects: [],
-    mentions: []
+    mentions: [],
+    expansions: {}
   });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -442,6 +466,27 @@ const MainApp = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === ' ' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.nativeEvent.isComposing) {
+      const input = footerInputRef.current;
+      if (input && input.selectionStart === input.selectionEnd) {
+        const caret = input.selectionStart ?? inputValue.length;
+        const result = expandOnSpace(inputValue, caret, autocompleteConfig.expansions);
+        if (result.expanded) {
+          e.preventDefault();
+          setInputValue(result.newText);
+          setCaretPos(result.newCaretPos);
+          setDismissed(false);
+          setSelectedIndex(0);
+          setTimeout(() => {
+            if (footerInputRef.current) {
+              footerInputRef.current.focus();
+              footerInputRef.current.setSelectionRange(result.newCaretPos, result.newCaretPos);
+            }
+          }, 0);
+          return;
+        }
+      }
+    }
     if (e.key === 'Tab' && showSuggestions) {
       e.preventDefault();
       const activeMatch = matches[selectedIndex] || matches[0];
