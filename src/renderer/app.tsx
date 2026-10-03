@@ -564,6 +564,10 @@ const MainApp = () => {
         setWarning('Cannot insert break: current task is important and cannot be demoted.');
         return;
       }
+      if (currentTasks[0]?.isBreak) {
+        setWarning('Already on a break.');
+        return;
+      }
       setHistory(currentTasks);
       setTasks(prev => {
         const breakTask: TaskItem = { id: Date.now().toString(), text: 'Break ☕', completed: false, isBreak: true };
@@ -571,6 +575,36 @@ const MainApp = () => {
       });
       return;
     }
+
+    const handleMove = (fromIndex: number, toIndex: number) => {
+      if (fromIndex < 0 || fromIndex >= currentTasks.length || toIndex < 0 || toIndex >= currentTasks.length) {
+        setWarning('Move index out of bounds.');
+        return;
+      }
+
+      if (currentTasks[fromIndex]?.isBreak) {
+        setWarning('Cannot move a break.');
+        return;
+      }
+
+      if (isDemotion(currentTasks, fromIndex, toIndex)) {
+        setWarning('Action rejected: current task is important and cannot be demoted.');
+        return;
+      }
+
+      setHistory(currentTasks);
+      setTasks(prev => {
+        const updated = [...prev];
+        const [item] = updated.splice(fromIndex, 1);
+        if (prev[0]?.isBreak && toIndex === 0) {
+          updated.shift();
+          updated.unshift(item);
+        } else {
+          updated.splice(toIndex, 0, item);
+        }
+        return updated;
+      });
+    };
 
     // 3. /m[ove] x u|d [y]
     const moveDirMatch = text.match(/^\/m(?:ove)?\s+(\d+)\s+(u|d)(?:\s+(\d+))?$/i);
@@ -589,18 +623,7 @@ const MainApp = () => {
       if (toIndex < 0) toIndex = 0;
       if (toIndex >= currentTasks.length) toIndex = currentTasks.length - 1;
 
-      if (isDemotion(currentTasks, fromIndex, toIndex)) {
-        setWarning('Action rejected: current task is important and cannot be demoted.');
-        return;
-      }
-
-      setHistory(currentTasks);
-      setTasks(prev => {
-        const updated = [...prev];
-        const [item] = updated.splice(fromIndex, 1);
-        updated.splice(toIndex, 0, item);
-        return updated;
-      });
+      handleMove(fromIndex, toIndex);
       return;
     }
 
@@ -610,26 +633,7 @@ const MainApp = () => {
       const x = parseInt(movePosMatch[1], 10);
       const y = parseInt(movePosMatch[2], 10);
 
-      const fromIndex = x;
-      const toIndex = y;
-
-      if (fromIndex < 0 || fromIndex >= currentTasks.length || toIndex < 0 || toIndex >= currentTasks.length) {
-        setWarning('Move index out of bounds.');
-        return;
-      }
-
-      if (isDemotion(currentTasks, fromIndex, toIndex)) {
-        setWarning('Action rejected: current task is important and cannot be demoted.');
-        return;
-      }
-
-      setHistory(currentTasks);
-      setTasks(prev => {
-        const updated = [...prev];
-        const [item] = updated.splice(fromIndex, 1);
-        updated.splice(toIndex, 0, item);
-        return updated;
-      });
+      handleMove(x, y);
       return;
     }
 
@@ -692,6 +696,10 @@ const MainApp = () => {
     if (importantMatch) {
       if (currentTasks.length === 0) {
         setWarning('No current task to mark important.');
+        return;
+      }
+      if (currentTasks[0]?.isBreak) {
+        setWarning('Cannot mark a break as important.');
         return;
       }
       setHistory(currentTasks);
@@ -810,6 +818,9 @@ const MainApp = () => {
         setHistory(currentTasks);
         setTasks(prev => {
           const newTask: TaskItem = { id: Date.now().toString(), text: taskText, completed: false };
+          if (prev[0]?.isBreak) {
+            return [newTask, ...prev.slice(1)];
+          }
           return [newTask, ...prev];
         });
       }
