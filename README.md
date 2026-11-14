@@ -1,5 +1,10 @@
 # TaskConveyor
 
+> [!WARNING]
+> A new Rust and GPUI-based port is available at [task-conveyor-rs](https://github.com/thealternator89/task-conveyor-rs). This port has now reached full parity so this repo will **no longer be maintained.**
+> 
+> Why move to `task-conveyor-rs`? It's much smaller, faster and more efficient - the download size is approximately 90% smaller (~16MB vs ~150MB) and uses considerably less memory.
+
 TaskConveyor is a sleek, always-on task manager that docks to the side of your display. Designed for developers and power users, the app features a completely **keyboard-driven, button-free user interface** controlled via a global hotkey-activated Spotlight overlay or a footer command bar.
 
 Tasks automatically shift up like a conveyor belt as you complete them, and you can safeguard urgent items using the built-in demotion blocker.
